@@ -5,7 +5,7 @@ A Payload CMS database adapter that integrates SurrealDB as a database backend. 
 [![npm version](https://img.shields.io/npm/v/@rubixstudios/payload-surrealdb.svg)](https://www.npmjs.com/package/@rubixstudios/payload-surrealdb)
 [![Release](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/actions/workflows/release.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/actions/workflows/release.yml)
 
-<img width="1919" height="1078" alt="image" src="https://github.com/user-attachments/assets/8f65606c-0c09-49b4-af32-c421aa53e402" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/0241dadb-f664-44fe-98e9-ebc403f7033a" />
 
 SurrealDB is an open-source, multi-model database designed to support structured and relational data through a unified database engine.
 
