@@ -3,8 +3,14 @@ import { setTimeout } from 'node:timers/promises'
 import { promisify } from 'node:util'
 
 const exec = promisify(execFile)
-const endpoint = 'http://127.0.0.1:18000'
-const password = 'local-test-password'
+const { SURREAL_TEST_ENDPOINT: configuredEndpoint, SURREAL_TEST_PASSWORD: configuredPassword } =
+  process.env
+
+if (Boolean(configuredEndpoint) !== Boolean(configuredPassword)) {
+  throw new Error('Set SURREAL_TEST_ENDPOINT and SURREAL_TEST_PASSWORD together')
+}
+
+const password = configuredPassword || 'local-test-password'
 const controller = new AbortController()
 const { signal } = controller
 const interrupt = () => controller.abort()
@@ -12,47 +18,40 @@ const interrupt = () => controller.abort()
 process.once('SIGINT', interrupt)
 process.once('SIGTERM', interrupt)
 
-async function waitForDatabase() {
-  const deadline = Date.now() + 30_000
-
-  while (Date.now() < deadline) {
-    signal.throwIfAborted()
-
-    const response = await fetch(`${endpoint}/health`, {
-      signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]),
-    }).catch(() => undefined)
-
-    if (response?.ok) {
-      return
-    }
-
-    await setTimeout(250, undefined, { signal })
-  }
-
-  throw new Error(`SurrealDB did not become ready at ${endpoint}`)
-}
-
-const { stdout } = await exec('docker', [
-  'run',
-  '--rm',
-  '-d',
-  '-p',
-  '127.0.0.1:18000:8000',
-  'surrealdb/surrealdb:v4.0.1',
-  'start',
-  '--bind',
-  '0.0.0.0:8000',
-  '--user',
-  'root',
-  '--pass',
-  password,
-  'memory',
-])
-
-const container = stdout.trim()
+let container
+let endpoint = configuredEndpoint
 
 try {
-  await waitForDatabase()
+  if (!endpoint) {
+    const { stdout } = await exec(
+      'docker',
+      [
+        'create',
+        '--publish',
+        '127.0.0.1::8000',
+        '--env',
+        'SURREAL_USER=root',
+        '--env',
+        'SURREAL_PASS',
+        'surrealdb/surrealdb:v4.0.1',
+        'start',
+        '--bind',
+        '0.0.0.0:8000',
+        'memory',
+      ],
+      { env: { ...process.env, SURREAL_PASS: password } }
+    )
+
+    container = stdout.trim()
+
+    await exec('docker', ['start', container])
+
+    const { stdout: publishedAddress } = await exec('docker', ['port', container, '8000/tcp'])
+
+    endpoint = `http://${publishedAddress.trim()}`
+  }
+
+  await waitForDatabase(endpoint, container)
 
   process.exitCode = await new Promise((resolve, reject) => {
     const child = spawn(
@@ -72,16 +71,88 @@ try {
     child.once('error', reject)
     child.once('exit', (code) => resolve(code ?? 1))
   })
+
+  if (process.exitCode && container) {
+    await showDatabaseLogs(container)
+  }
+} catch (error) {
+  if (container && !signal.aborted) {
+    await showDatabaseLogs(container)
+  }
+
+  throw error
 } finally {
   try {
-    await exec('docker', ['stop', container])
-  } catch (error) {
-    if (!error.stderr?.includes('No such container')) {
-      console.error('Could not stop the SurrealDB test container', error.message)
-      process.exitCode ||= 1
+    if (container) {
+      await exec('docker', ['rm', '--force', '--volumes', container])
     }
+  } catch (error) {
+    console.error('Could not remove the SurrealDB test container', error.message)
+    process.exitCode ||= 1
   } finally {
     process.off('SIGINT', interrupt)
     process.off('SIGTERM', interrupt)
+  }
+}
+
+async function waitForDatabase(endpoint, container) {
+  const url = new URL('/ready', endpoint)
+  const deadline = Date.now() + 30_000
+  let lastFailure
+
+  while (Date.now() < deadline) {
+    signal.throwIfAborted()
+
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]),
+      })
+
+      await response.body?.cancel()
+
+      if (response.ok) {
+        return
+      }
+
+      lastFailure = new Error(`HTTP ${response.status}`)
+    } catch (error) {
+      lastFailure = error
+    }
+
+    signal.throwIfAborted()
+
+    if (container) {
+      const { stdout } = await exec('docker', [
+        'inspect',
+        '--format',
+        '{{.State.Status}} (exit code {{.State.ExitCode}})',
+        container,
+      ])
+      const status = stdout.trim()
+
+      if (!status.startsWith('running ')) {
+        throw new Error(`SurrealDB container stopped before becoming ready: ${status}`)
+      }
+    }
+
+    await setTimeout(250, undefined, { signal })
+  }
+
+  throw new Error(`SurrealDB did not become ready at ${url}`, { cause: lastFailure })
+}
+
+async function showDatabaseLogs(container) {
+  try {
+    const { stdout, stderr } = await exec('docker', ['logs', '--tail', '100', container])
+
+    if (stdout) {
+      console.error(stdout.trimEnd())
+    }
+
+    if (stderr) {
+      console.error(stderr.trimEnd())
+    }
+  } catch (error) {
+    console.error('Could not read the SurrealDB test container logs', error.message)
   }
 }
