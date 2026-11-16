@@ -64,7 +64,7 @@ jobs:
             --env SURREAL_PASS \
             surrealdb/surrealdb:v4.0.1 \
             start --bind 0.0.0.0:8000 memory
-      
+
           curl --fail --silent --show-error \
             --retry 30 \
             --retry-all-errors \

@@ -6,15 +6,20 @@ import { type PostgresAdapter } from '@payloadcms/db-postgres'
 import { is, type SQLWrapper, StringChunk, sql } from 'drizzle-orm'
 
 import { dropSchema } from './drop.js'
-import { inlineKeys } from './initial.js'
+import { inlineAddedKeys, inlineKeys } from './initial.js'
 import { planRemoval, remove } from './removal.js'
 import { split } from './statements.js'
 
-const postgres = `SELECT to_regclass('"payload_migrations"') AS exists;`
+const postgres = `
+  SELECT to_regclass('"payload_migrations"') AS exists;
+`.trim()
 
-const surreal = `SELECT COUNT(*) AS "exists"
-FROM information_schema.tables
-WHERE table_schema = 'public' AND table_name = 'payload_migrations';`
+const surreal = `
+  SELECT COUNT(*) AS "exists"
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+    AND table_name = 'payload_migrations';
+`.trim()
 
 const scope = new AsyncLocalStorage<'migrate' | 'down' | 'fresh'>()
 
@@ -45,7 +50,7 @@ export function bindDatabase(adapter: PostgresAdapter): void {
     return (async () => {
       let result: Awaited<ReturnType<typeof execute<Row>>> | undefined
 
-      for (const statement of statements) {
+      for (const statement of inlineAddedKeys(statements)) {
         result = await execute<Row>(sql.raw(statement))
       }
 
