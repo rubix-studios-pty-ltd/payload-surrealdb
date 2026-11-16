@@ -73,11 +73,11 @@ try {
   })
 
   if (process.exitCode && container) {
-    await showDatabaseLogs(container)
+    await showLogs(container)
   }
 } catch (error) {
   if (container && !signal.aborted) {
-    await showDatabaseLogs(container)
+    await showLogs(container)
   }
 
   throw error
@@ -141,7 +141,7 @@ async function waitForDatabase(endpoint, container) {
   throw new Error(`SurrealDB did not become ready at ${url}`, { cause: lastFailure })
 }
 
-async function showDatabaseLogs(container) {
+async function showLogs(container) {
   try {
     const { stdout, stderr } = await exec('docker', ['logs', '--tail', '100', container])
 
