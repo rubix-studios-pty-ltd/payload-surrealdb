@@ -5,7 +5,7 @@ import { surrealdbAdapter } from '@rubixstudios/payload-surrealdb'
 
 const url = 'surrealdb+ws://127.0.0.1:8000/test/application'
 
-test('adapter supports existing connection forms and validates an absent URL', () => {
+test('adapter supports existing connection and validates missing URL', () => {
   for (const pool of [url, { connectionString: url, max: 6 }]) {
     const adapter = surrealdbAdapter({ pool }).init({ payload: {} })
 

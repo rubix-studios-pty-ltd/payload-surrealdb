@@ -2,11 +2,11 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { type PoolConfig } from '@surrealdb/pg'
 
-type Capture = { socket?: WebSocket; timeout?: number }
-type Statement = { status: string; result: unknown }
-type Reply = { id?: string; result?: Statement[]; error?: { message?: string } }
+type SocketCapture = { socket?: WebSocket; timeout?: number }
+type StatementResult = { status: string; result: unknown }
+type QueryReply = { id?: string; result?: StatementResult[]; error?: { message?: string } }
 
-const sockets = new AsyncLocalStorage<Capture>()
+const sockets = new AsyncLocalStorage<SocketCapture>()
 const transactionID = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i
 
 export function migrationPool(options: PoolConfig): PoolConfig {
@@ -37,7 +37,8 @@ export async function executeSurrealDDL<T>(
   text: string,
   transactionQuery: () => PromiseLike<T>
 ): Promise<T> {
-  const capture: Capture = {}
+  const capture: SocketCapture = {}
+
   const result = await sockets.run(capture, async () => await transactionQuery())
   const { socket, timeout } = capture
 
@@ -62,10 +63,11 @@ function query(
   text: string,
   timeout: number | undefined,
   txn?: string
-): Promise<Statement[]> {
+): Promise<StatementResult[]> {
   return new Promise((resolve, reject) => {
     if (socket.readyState !== 1) {
       reject(new Error('SurrealDB connection closed before running a migration query'))
+
       return
     }
 
@@ -91,15 +93,16 @@ function query(
     }
 
     function receive({ data }: MessageEvent<unknown>): void {
-      let reply: Reply
+      let reply: QueryReply
 
       try {
-        const json =
-          typeof data === 'string'
-            ? data
-            : data instanceof ArrayBuffer || ArrayBuffer.isView(data)
-              ? new TextDecoder().decode(data)
-              : undefined
+        let json: string | undefined
+
+        if (typeof data === 'string') {
+          json = data
+        } else if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+          json = new TextDecoder().decode(data)
+        }
 
         if (!json) {
           return
@@ -116,12 +119,14 @@ function query(
 
       if (reply.error || !Array.isArray(reply.result) || !reply.result.length) {
         fail(new Error(reply.error?.message ?? 'Invalid SurrealDB migration query response'))
+
         return
       }
 
       for (const statement of reply.result) {
         if (statement?.status !== 'OK') {
           fail(new Error(`SurrealDB migration query failed: ${String(statement?.result)}`))
+
           return
         }
       }

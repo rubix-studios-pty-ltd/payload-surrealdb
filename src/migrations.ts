@@ -6,17 +6,26 @@ import { type PostgresAdapter } from '@payloadcms/db-postgres'
 import { is, type SQLWrapper, StringChunk, sql } from 'drizzle-orm'
 
 import { dropSchema } from './drop.js'
-import { inlineKeys } from './initial.js'
+import { inlineAddedKeys, inlineKeys } from './initial.js'
 import { planRemoval, remove } from './removal.js'
 import { split } from './statements.js'
 
-const postgres = `SELECT to_regclass('"payload_migrations"') AS exists;`
+type Mode = 'migrate' | 'down' | 'fresh'
+type Session = PostgresAdapter['sessions'][string]
 
-const surreal = `SELECT COUNT(*) AS "exists"
-FROM information_schema.tables
-WHERE table_schema = 'public' AND table_name = 'payload_migrations';`
+const postgresHistory = `
+  SELECT to_regclass('"payload_migrations"') AS exists;
+`.trim()
 
-const scope = new AsyncLocalStorage<'migrate' | 'down' | 'fresh'>()
+const surrealHistory = `
+  SELECT COUNT(*) AS "exists"
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+    AND table_name = 'payload_migrations';
+`.trim()
+
+const filePattern = /^\d{8}_\d{6}(?:_\w+)?\.ts$/
+const scope = new AsyncLocalStorage<Mode>()
 
 export function bindDatabase(adapter: PostgresAdapter): void {
   const db = adapter.drizzle
@@ -45,7 +54,7 @@ export function bindDatabase(adapter: PostgresAdapter): void {
     return (async () => {
       let result: Awaited<ReturnType<typeof execute<Row>>> | undefined
 
-      for (const statement of statements) {
+      for (const statement of inlineAddedKeys(statements)) {
         result = await execute<Row>(sql.raw(statement))
       }
 
@@ -63,7 +72,7 @@ export async function startupMigrate(adapter: PostgresAdapter): Promise<void> {
 
   if (migrations.length) {
     const drizzle = adapter.drizzle
-    const history = await adapter.execute({ drizzle, raw: postgres })
+    const history = await adapter.execute({ drizzle, raw: postgresHistory })
 
     if (history.rows[0]?.exists) {
       const dev = await adapter.execute({
@@ -79,8 +88,6 @@ export async function startupMigrate(adapter: PostgresAdapter): Promise<void> {
 
   await adapter.migrate({ migrations })
 }
-
-type Session = PostgresAdapter['sessions'][string]
 
 export function bindMigrations(adapter: PostgresAdapter): void {
   const createMigration = adapter.createMigration.bind(adapter)
@@ -112,23 +119,16 @@ export function bindMigrations(adapter: PostgresAdapter): void {
   }
 
   adapter.execute = async (query) => {
-    if (query.raw !== postgres) {
+    if (query.raw !== postgresHistory) {
       return execute(query)
     }
 
-    const result = await execute({ ...query, raw: surreal })
+    const result = await execute({ ...query, raw: surrealHistory })
 
     return {
       ...result,
       rows: [{ exists: Number(result.rows[0]?.exists) > 0 }],
     }
-  }
-
-  function inMigration<Args extends unknown[], Result>(
-    run: (...args: Args) => Result,
-    mode: 'migrate' | 'down' | 'fresh' = 'migrate'
-  ): (...args: Args) => Result {
-    return (...args) => scope.run(mode, () => run(...args))
   }
 
   adapter.migrate = inMigration(adapter.migrate.bind(adapter))
@@ -148,7 +148,7 @@ export function bindMigrations(adapter: PostgresAdapter): void {
     const session = id === null ? undefined : adapter.sessions[id]
 
     if (session && mode === 'down') {
-      bindMigrationSQL(session, failures)
+      bindRollbackSQL(session, failures)
     }
 
     return id
@@ -181,6 +181,13 @@ export function bindMigrations(adapter: PostgresAdapter): void {
 
     await dropSchema(adapter)
   }
+}
+
+function inMigration<Args extends unknown[], Result>(
+  run: (...args: Args) => Result,
+  mode: Mode = 'migrate'
+): (...args: Args) => Result {
+  return (...args) => scope.run(mode, () => run(...args))
 }
 
 async function refreshMigrations(
@@ -221,23 +228,27 @@ async function refreshMigrations(
 function migrationFiles(directory: string): Map<string, bigint> {
   const files = new Map<string, bigint>()
 
-  if (existsSync(directory)) {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.isFile() && /^\d{8}_\d{6}(?:_\w+)?\.ts$/.test(entry.name)) {
-        const file = join(directory, entry.name)
-        const stats = statSync(file, { bigint: true, throwIfNoEntry: false })
+  if (!existsSync(directory)) {
+    return files
+  }
 
-        if (stats) {
-          files.set(file, stats.mtimeNs)
-        }
-      }
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isFile() || !filePattern.test(entry.name)) {
+      continue
+    }
+
+    const file = join(directory, entry.name)
+    const stats = statSync(file, { bigint: true, throwIfNoEntry: false })
+
+    if (stats) {
+      files.set(file, stats.mtimeNs)
     }
   }
 
   return files
 }
 
-function bindMigrationSQL(session: Session, failures: WeakMap<Session, unknown>): void {
+function bindRollbackSQL(session: Session, failures: WeakMap<Session, unknown>): void {
   const { db } = session
   const execute = db.execute.bind(db)
 

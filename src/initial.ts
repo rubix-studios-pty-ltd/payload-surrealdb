@@ -12,6 +12,25 @@ const createIndex = new RegExp(
   'i'
 )
 const addColumn = new RegExp(`^ALTER\\s+TABLE\\s+${tableName}\\s+ADD\\s+COLUMN\\b`, 'i')
+const addedColumnName = new RegExp(
+  `${addColumn.source}\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(${identifier})`,
+  'i'
+)
+const foreignKeyColumns = new RegExp(
+  `^CONSTRAINT\\s+${identifier}\\s+FOREIGN\\s+KEY\\s*\\(\\s*(${identifier}(?:\\s*,\\s*${identifier})*)\\s*\\)`,
+  'i'
+)
+const columnIdentifiers = new RegExp(identifier, 'gi')
+const addKeyColumn = new RegExp(
+  `${addColumn.source}\\s+(${identifier})\\s+(?:smallint|integer|bigint|uuid|text|varchar)$`,
+  'i'
+)
+const keyColumn = new RegExp(
+  `^CONSTRAINT\\s+${identifier}\\s+FOREIGN\\s+KEY\\s*\\(\\s*(${identifier})\\s*\\)\\s+` +
+    `(REFERENCES\\s+${tableName}\\s*\\(\\s*(?:"id"|id)\\s*\\)` +
+    `(?:\\s+ON\\s+(?:DELETE\\s+(?:CASCADE|NO\\s+ACTION|RESTRICT|SET\\s+NULL)|UPDATE\\s+NO\\s+ACTION))*)$`,
+  'i'
+)
 const reference = new RegExp(`^\\s+${tableName}\\s*\\(`, 'i')
 
 type Definition = {
@@ -21,28 +40,31 @@ type Definition = {
   constraints: string[]
 }
 
-export function inlineKeys(statement: string): string {
-  const statements = split(statement)
+type AddedColumn = { index: number; statement: string }
+
+export function inlineKeys(source: string): string {
+  const statements = split(source)
   const definitions = new Map<string, Definition>()
   const positions = new Map<number, Definition>()
   const indexed = new Set<string>()
 
-  for (const [index, entry] of statements.entries()) {
-    const table = identifierName(createTable.exec(entry)?.[1])
+  for (const [index, statement] of statements.entries()) {
+    const table = identifierName(createTable.exec(statement)?.[1])
 
     if (table !== undefined) {
       if (definitions.has(table)) {
-        return statement
+        return source
       }
 
-      const definition = { name: table, index, statement: entry, constraints: [] }
+      const definition: Definition = { name: table, index, statement, constraints: [] }
 
       definitions.set(table, definition)
       positions.set(index, definition)
+
       continue
     }
 
-    const owner = identifierName(createIndex.exec(entry)?.[1])
+    const owner = identifierName(createIndex.exec(statement)?.[1])
 
     if (owner !== undefined) {
       indexed.add(owner)
@@ -50,20 +72,53 @@ export function inlineKeys(statement: string): string {
   }
 
   const inlined = new Set<number>()
+  const addedColumns = new Map<string, Set<string>>()
 
-  for (const [index, entry] of statements.entries()) {
-    const [, tableName, constraint] = addForeignKey.exec(entry) ?? []
-    const owner = identifierName(tableName)
+  for (const [index, statement] of statements.entries()) {
+    const [, alteredTable, columnName] = addedColumnName.exec(statement) ?? []
+    const altered = identifierName(alteredTable)
+    const column = identifierName(columnName)
+
+    if (altered !== undefined && column !== undefined) {
+      const definition = definitions.get(altered)
+
+      if (definition && definition.index < index) {
+        const columns = addedColumns.get(altered) ?? new Set<string>()
+
+        columns.add(column)
+        addedColumns.set(altered, columns)
+      }
+
+      continue
+    }
+
+    const [, table, constraint] = addForeignKey.exec(statement) ?? []
+    const owner = identifierName(table)
     const definition = owner === undefined ? undefined : definitions.get(owner)
 
-    if (definition && indexed.has(definition.name) && definition.index < index && constraint) {
-      definition.constraints.push(constraint)
-      inlined.add(index)
+    if (!definition || !indexed.has(definition.name) || definition.index >= index || !constraint) {
+      continue
     }
+
+    const sourceColumns = foreignKeyColumns.exec(constraint)?.[1]
+    const laterColumns = addedColumns.get(definition.name)
+
+    if (
+      !sourceColumns ||
+      [...sourceColumns.matchAll(columnIdentifiers)].some(([name]) => {
+        const column = identifierName(name)
+        return column !== undefined && laterColumns?.has(column)
+      })
+    ) {
+      continue
+    }
+
+    definition.constraints.push(constraint)
+    inlined.add(index)
   }
 
   if (!inlined.size) {
-    return statement
+    return source
   }
 
   for (const group of tableGroups(statements, positions, definitions)) {
@@ -71,15 +126,16 @@ export function inlineKeys(statement: string): string {
       continue
     }
 
-    for (const [position, { constraints, statement }] of orderTables(
-      group,
-      definitions
-    ).entries()) {
-      const index = group[position]?.index
+    const ordered = orderTables(group, definitions)
 
-      if (index === undefined) {
+    for (const [position, { index }] of group.entries()) {
+      const definition = ordered[position]
+
+      if (!definition) {
         continue
       }
+
+      const { constraints, statement } = definition
 
       statements[index] = constraints.length
         ? `${statement.slice(0, -1).trimEnd()},\n  ${constraints.map(endLineComment).join(',\n  ')}\n)`
@@ -89,8 +145,57 @@ export function inlineKeys(statement: string): string {
 
   return statements
     .filter((_, index) => !inlined.has(index))
-    .map((entry) => `${endLineComment(entry)};`)
+    .map((statement) => `${endLineComment(statement)};`)
     .join('\n')
+}
+
+export function inlineAddedKeys(statements: string[]): string[] {
+  const rewritten: (string | undefined)[] = [...statements]
+  const pending = new Map<string, Map<string, AddedColumn>>()
+
+  for (const [index, statement] of statements.entries()) {
+    const addition = addKeyColumn.exec(statement)
+    const owner = identifierName(addition?.[1])
+    const column = identifierName(addition?.[2])
+
+    if (owner !== undefined && column !== undefined) {
+      const columns = pending.get(owner) ?? new Map<string, AddedColumn>()
+
+      columns.set(column, { index, statement })
+      pending.set(owner, columns)
+
+      continue
+    }
+
+    const foreignKey = addForeignKey.exec(statement)
+    const constraint = foreignKey?.[2] ? keyColumn.exec(foreignKey[2]) : null
+    const keyOwner = identifierName(foreignKey?.[1])
+    const keyColumnName = identifierName(constraint?.[1])
+    const references = constraint?.[2]
+
+    if (keyOwner !== undefined && keyColumnName !== undefined && references !== undefined) {
+      const columns = pending.get(keyOwner)
+      const added = columns?.get(keyColumnName)
+
+      if (added) {
+        rewritten[added.index] = `${added.statement} ${references}`
+        rewritten[index] = undefined
+        columns?.delete(keyColumnName)
+      }
+
+      continue
+    }
+
+    const indexedTable = identifierName(createIndex.exec(statement)?.[1])
+
+    if (indexedTable === undefined) {
+      pending.clear()
+    } else {
+      pending.delete(indexedTable)
+    }
+  }
+
+  return rewritten.filter((statement) => statement !== undefined)
 }
 
 function* tableGroups(
