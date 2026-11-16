@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: npm-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: write
+  issues: write
+  pull-requests: write
+  packages: write
+
+jobs:
+  test:
+    name: Payload ${{ matrix.payload }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [ "26.13.1" ]
+        payload: [ "3.93.0", "4.0.0-beta.9" ]
+
+    env:
+      SURREAL_TEST_ENDPOINT: http://127.0.0.1:18000
+      SURREAL_TEST_PASSWORD: local-ci-password
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6.1.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Select Payload
+        if: matrix.payload == '4.0.0-beta.9'
+        run: pnpm add --save-dev --save-exact payload@4.0.0-beta.9 @payloadcms/db-postgres@4.0.0-beta.9
+
+      - name: Check source
+        run: pnpm exec biome check src test package.json tsconfig.json
+
+      - run: pnpm test
+
+      - name: Start SurrealDB
+        run: |
+          SURREAL_PASS="$SURREAL_TEST_PASSWORD" docker run \
+            --detach --rm \
+            --name payload-surrealdb-test \
+            --publish 127.0.0.1:18000:8000 \
+            --env SURREAL_USER=root \
+            --env SURREAL_PASS \
+            surrealdb/surrealdb:v4.0.1 \
+            start --bind 0.0.0.0:8000 memory
+
+          curl --fail --silent --show-error \
+            --retry 20 \
+            --retry-connrefused \
+            --retry-delay 1 \
+            "$SURREAL_TEST_ENDPOINT/health"
+
+      - run: pnpm test:integration
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker logs payload-surrealdb-test || true
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6.1.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.13.1
+          check-latest: true
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm exec biome check .
+
+      - name: Build
+        run: pnpm build
+
+      - name: Upgrade npm for OIDC
+        run: |
+          npm install -g npm@latest
+          echo "npm version: $(npm --version)"
+
+      - name: Release
+        run: pnpm release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true

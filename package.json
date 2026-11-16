@@ -1,0 +1,102 @@
+{
+  "name": "@rubixstudios/payload-surrealdb",
+  "version": "0.1.0",
+  "description": "SurrealDB adapter for Payload CMS",
+  "license": "MIT",
+  "author": "Rubix Studios <hello@rubixstudios.com.au> (https://rubixstudios.com.au)",
+  "homepage": "https://rubixstudios.com.au",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rubix-studios-pty-ltd/payload-surrealdb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rubix-studios-pty-ltd/payload-surrealdb/issues"
+  },
+  "maintainers": [
+    {
+      "name": "Rubix Studios",
+      "email": "hello@rubixstudios.com.au",
+      "url": "https://rubixstudios.com.au"
+    }
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./migration-utils": {
+      "types": "./dist/exports/migration-utils.d.ts",
+      "import": "./dist/exports/migration-utils.js"
+    },
+    "./drizzle": {
+      "types": "./dist/drizzle-proxy/index.d.ts",
+      "import": "./dist/drizzle-proxy/index.js"
+    },
+    "./drizzle/pg-core": {
+      "types": "./dist/drizzle-proxy/pg-core.d.ts",
+      "import": "./dist/drizzle-proxy/pg-core.js"
+    },
+    "./drizzle/node-postgres": {
+      "types": "./dist/drizzle-proxy/node-postgres.d.ts",
+      "import": "./dist/drizzle-proxy/node-postgres.js"
+    },
+    "./drizzle/relations": {
+      "types": "./dist/drizzle-proxy/relations.d.ts",
+      "import": "./dist/drizzle-proxy/relations.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "tsconfig.json"
+  ],
+  "scripts": {
+    "build": "pnpm build:types && pnpm build:swc",
+    "build:swc": "swc ./src -d ./dist --config-file .swcrc --strip-leading-paths",
+    "build:types": "tsc -p tsconfig.json",
+    "clean": "rimraf -g {dist,*.tsbuildinfo} && pnpm exec biome check --write && pnpm biome migrate --write",
+    "update": "pnpm self-update && pnpm update --latest && pnpm install && pnpm prune && pnpm dedupe && pnpm run clean",
+    "release": "semantic-release",
+    "test": "pnpm build && pnpm test:unit",
+    "test:unit": "node --test test/*.test.mjs",
+    "test:integration": "node --import tsx --test --test-force-exit test/payload.integration.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "@payloadcms/db-postgres": "^3.93.0",
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/git": "^11.0.1",
+    "@swc/cli": "^0.8.2",
+    "@swc/core": "^1.16.22",
+    "@types/node": "^26.6.6",
+    "@types/to-snake-case": "1.0.2",
+    "conventional-changelog-conventionalcommits": "^10.4.1",
+    "drizzle-orm": "0.45.2",
+    "payload": "^3.93.0",
+    "rimraf": "^6.1.4",
+    "semantic-release": "^26.0.1",
+    "tsx": "4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "@payloadcms/db-postgres": "^3.93.0 || ^4.0.0-beta.9",
+    "drizzle-orm": "0.45.2",
+    "payload": "^3.93.0 || ^4.0.0-beta.9"
+  },
+  "engines": {
+    "node": ">=24.22.3 <25 || >=26.13.1",
+    "pnpm": ">=10"
+  },
+  "dependencies": {
+    "@surrealdb/pg": "^0.2.0",
+    "to-snake-case": "^1.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
+  },
+  "packageManager": "pnpm@12.21.0"
+}
