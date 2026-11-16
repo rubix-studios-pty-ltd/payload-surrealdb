@@ -37,12 +37,14 @@ test('initial DDL creates parents before children and retains indexes and quoted
 
 test('initial DDL leaves existing-table changes and mixed SQL alone', () => {
   const existing = `
-ALTER TABLE "existing" ADD CONSTRAINT "existing_parent_fk" FOREIGN KEY ("parent_id") REFERENCES "parent"("id");
-CREATE INDEX "existing_parent_idx" ON "existing" ("parent_id");
-`
+    ALTER TABLE "existing" ADD CONSTRAINT "existing_parent_fk" FOREIGN KEY ("parent_id") REFERENCES "parent"("id");
+    CREATE INDEX "existing_parent_idx" ON "existing" ("parent_id");
+  `.trim()
+
   assert.equal(inlineKeys(existing), existing)
 
   const mixed = 'CREATE TABLE "parent" ("id" serial PRIMARY KEY); SELECT 1;'
+
   assert.equal(inlineKeys(mixed), mixed)
 })
 
@@ -59,7 +61,7 @@ test('initial DDL rewrites indexed tables and preserves unrelated statements in 
     ALTER TABLE "child" ADD CONSTRAINT "child_fk" FOREIGN KEY ("parent_id") REFERENCES "parent"("id");
     ${otherKey};
     ${index};
-  `
+  `.trim()
 
   const [parent, child, unindexed, ...rest] = split(inlineKeys(source))
 
@@ -80,7 +82,7 @@ test('initial DDL follows existing inline references and ignores references in l
     CREATE TABLE "middle" ("id" integer PRIMARY KEY, "parent_id" integer REFERENCES "public"."parent"("id"));
     ALTER TABLE "child" ADD CONSTRAINT "child_fk" FOREIGN KEY ("middle_id") REFERENCES "middle"("id");
     CREATE INDEX "child_idx" ON "child" ("middle_id");
-  `
+  `.trim()
 
   const [parent, middle, child] = split(inlineKeys(source))
 
@@ -98,7 +100,7 @@ test('initial DDL can reorder tables across a column addition to an existing tab
     CREATE TABLE "parent" ("id" integer PRIMARY KEY);
     ALTER TABLE "child" ADD CONSTRAINT "child_fk" FOREIGN KEY ("parent_id") REFERENCES "parent"("id");
     CREATE INDEX "child_idx" ON "child" ("parent_id");
-  `
+  `.trim()
 
   const [parent, alter, child, index] = split(inlineKeys(source))
 
@@ -116,7 +118,7 @@ test('initial DDL reports a cycle when both foreign keys need inlining', () => {
     ALTER TABLE "second" ADD CONSTRAINT "second_fk" FOREIGN KEY ("first_id") REFERENCES "first"("id");
     CREATE INDEX "first_idx" ON "first" ("second_id");
     CREATE INDEX "second_idx" ON "second" ("first_id");
-  `
+  `.trim()
 
   assert.throws(() => inlineKeys(source), /cyclic foreign keys \(first -> second -> first\)/)
   assert.doesNotThrow(() =>
@@ -157,11 +159,14 @@ test('foreign keys stay separate across statements that may depend on the new co
     'CREATE TABLE "tags" ("id" integer PRIMARY KEY)',
   ]) {
     const batch = [column, statement, foreignKey]
+
     assert.deepEqual(inlineAddedKeys(batch), batch)
   }
 
   assert.deepEqual(inlineAddedKeys([foreignKey]), [foreignKey])
+
   const onUpdate = [column, `${foreignKey} ON UPDATE CASCADE`]
+
   assert.deepEqual(inlineAddedKeys(onUpdate), onUpdate)
 })
 
@@ -174,7 +179,7 @@ const drop = `
   DROP INDEX "posts_rels_tags_id_idx";
   ALTER TABLE "posts_rels" DROP COLUMN "tags_id";
   DROP TYPE "public"."enum_tags_color";
-`
+`.trim()
 
 test('removal recognises a generated drop batch and preserves owning table names', () => {
   assert.deepEqual(planRemoval(drop), {

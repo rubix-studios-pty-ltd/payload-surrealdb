@@ -58,6 +58,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
 
     const statements = await response.json()
     assert.ok(Array.isArray(statements) && statements.length)
+
     for (const statement of statements) {
       assert.equal(statement.status, 'OK', JSON.stringify(statement.result))
     }
@@ -79,6 +80,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
 
   let base
   let payload
+
   t.after(async () => {
     await payload?.destroy()
     await base?.destroy()
@@ -92,8 +94,12 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       config: await makeConfig({ ...options, push: false }),
       key: `${namespace}_generator`,
     })
+
     try {
-      await generator.db.createMigration({ payload: generator, migrationName: 'initial' })
+      await generator.db.createMigration({
+        payload: generator,
+        migrationName: 'initial',
+      })
     } finally {
       await generator.destroy()
     }
@@ -105,8 +111,10 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       config: await makeConfig({ ...options, push: false }),
       key: `${namespace}_push_disabled`,
     })
+
     try {
       const { tables } = await query(`USE NS ${namespace} DB cms; INFO FOR DB;`)
+
       assert.equal(Object.hasOwn(tables, 'posts'), false)
       assert.equal(Object.hasOwn(tables, 'payload_migrations'), false)
     } finally {
@@ -117,15 +125,19 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       config: await makeConfig({ ...options, push: true }),
       key: namespace,
     })
+
     const { tables } = await query(`USE NS ${namespace} DB cms; INFO FOR DB;`)
+
     assert.ok(Object.hasOwn(tables, 'posts'), 'Startup must apply the pending migration')
     assert.equal(await count(base, 'payload-migrations'), 1)
 
     await base.db.connect()
+
     const { docs } = await base.find({
       collection: 'payload-migrations',
       overrideAccess: true,
     })
+
     assert.deepEqual(
       docs.map(({ name }) => name),
       [initialFile.replace(/\.ts$/, '')]
@@ -151,6 +163,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
         data: { title: 'Post before refresh' },
         overrideAccess: true,
       })
+
       assert.equal(await count(base, 'posts'), 1)
 
       await base.db.migrateRefresh()
@@ -171,7 +184,11 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       key: `${namespace}_with_tags`,
     })
 
-    await payload.db.createMigration({ payload, migrationName: 'with_tags' })
+    await payload.db.createMigration({
+      payload,
+      migrationName: 'with_tags',
+    })
+
     await payload.db.migrate()
     await payload.db.migrate()
 
@@ -185,11 +202,13 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       data: { name: 'Example Author' },
       overrideAccess: true,
     })
+
     const tag = await payload.create({
       collection: 'tags',
       data: { label: 'News', color: 'blue' },
       overrideAccess: true,
     })
+
     post = await payload.create({
       collection: 'posts',
       data: {
@@ -208,6 +227,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       data: { title: 'Revised post' },
       overrideAccess: true,
     })
+
     assert.equal(edited.title, 'Revised post')
 
     const result = await payload.find({
@@ -219,21 +239,34 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       page: 1,
       overrideAccess: true,
     })
+
     assert.equal(result.totalDocs, 1)
     assert.equal(result.docs[0].author.id, author.id)
     assert.equal(result.docs[0].author.name, 'Example Author')
+
     assert.deepEqual(
       result.docs[0].tags.map(({ id }) => id),
       [tag.id]
     )
+
     assert.deepEqual(
       result.docs[0].sections.map(({ heading }) => heading),
       ['First', 'Second']
     )
 
-    await payload.updateGlobal({ slug: 'settings', data: { title: 'Site' }, overrideAccess: true })
+    await payload.updateGlobal({
+      slug: 'settings',
+      data: { title: 'Site' },
+      overrideAccess: true,
+    })
+
     assert.equal(
-      (await payload.findGlobal({ slug: 'settings', overrideAccess: true })).title,
+      (
+        await payload.findGlobal({
+          slug: 'settings',
+          overrideAccess: true,
+        })
+      ).title,
       'Site'
     )
 
@@ -243,24 +276,38 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       draft: true,
       overrideAccess: true,
     })
+
     const loaded = await payload.findByID({
       collection: 'posts',
       id: draft.id,
       draft: true,
       overrideAccess: true,
     })
+
     assert.equal(loaded._status, 'draft')
-    await payload.delete({ collection: 'posts', id: draft.id, overrideAccess: true })
+
+    await payload.delete({
+      collection: 'posts',
+      id: draft.id,
+      overrideAccess: true,
+    })
   })
 
   await t.test('login creates a session and a failed SQL transaction rolls back', async () => {
     const data = { email: 'local@example.invalid', password: 'local-test-password' }
 
-    await payload.create({ collection: 'users', data, overrideAccess: true })
+    await payload.create({
+      collection: 'users',
+      data,
+      overrideAccess: true,
+    })
+
     const { token } = await payload.login({ collection: 'users', data })
+
     assert.ok(token)
 
     const before = await count(payload, 'authors')
+
     await assert.rejects(
       payload.db.drizzle.transaction(async (transaction) => {
         await transaction.execute(sql`INSERT INTO "authors" ("name") VALUES ('Roll back')`)
@@ -268,6 +315,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       }),
       /intentional rollback/
     )
+
     assert.equal(await count(payload, 'authors'), before)
   })
 
@@ -284,10 +332,12 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       const parents = pgTable('bigint_parents', {
         id: bigint('id', { mode: 'bigint' }).primaryKey(),
       })
+
       const children = pgTable('bigint_children', {
         id: bigint('id', { mode: 'bigint' }).primaryKey(),
         parentID: bigint('parent_id', { mode: 'bigint' }),
       })
+
       const schema = {
         parents,
         children,
@@ -296,6 +346,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
           parent: one(parents, { fields: [children.parentID], references: [parents.id] }),
         })),
       }
+
       const db = drizzle({ client: payload.db.pool, schema })
 
       bindRelations(db, schema)
@@ -354,6 +405,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     )
 
     const { tables } = await query(`USE NS ${namespace} DB cms; INFO FOR DB;`)
+
     assert.equal(Object.hasOwn(tables, 'forward_probe'), true)
     assert.equal(Object.hasOwn(tables, 'unreached_probe'), false)
     assert.equal(await count(payload, 'payload-migrations'), 2)
@@ -369,11 +421,13 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     )
 
     const database = await query(`USE NS ${namespace} DB cms; INFO FOR DB;`)
+
     assert.equal(Object.hasOwn(database.tables, 'tags'), false)
     assert.equal(Object.hasOwn(database.tables, '_tags_v'), false)
     assert.equal(Object.hasOwn(database.types, 'enum_tags_color'), false)
 
     const table = await query(`USE NS ${namespace} DB cms; INFO FOR TABLE posts_rels;`)
+
     assert.equal(Object.hasOwn(table.fields, 'authors_id'), true)
     assert.equal(Object.hasOwn(table.fields, 'tags_id'), false)
     assert.equal(Object.hasOwn(table.indexes, 'posts_rels_tags_id_idx'), false)
@@ -391,7 +445,9 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
 
   await t.test('migrate:fresh validates its input and reapplies both migrations', async () => {
     const before = await query(`USE NS ${namespace} DB cms; INFO FOR DB;`)
+
     assert.equal(Object.hasOwn(before.types, 'enum_posts_status'), true)
+
     const historyCount = await count(base, 'payload-migrations')
 
     const emptyDir = await mkdtemp(fileURLToPath(new URL('./.migrations-empty-', import.meta.url)))
@@ -416,6 +472,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     assert.equal(await count(payload, 'tags'), 0)
 
     const database = await query(`USE NS ${namespace} DB cms; INFO FOR DB;`)
+
     assert.equal(Object.hasOwn(database.types, 'enum_posts_status'), true)
     assert.equal(Object.hasOwn(database.types, 'enum_tags_color'), true)
   })
@@ -458,16 +515,20 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     `
       )
       await payload.db.migrate()
+
       assert.equal(await count(payload, 'payload-migrations'), 3)
 
       exposeMigrationError(t, payload)
+
       await assert.rejects(payload.db.migrateDown(), /forced SurrealQL failure/)
 
       assert.deepEqual(
         (await payload.db.drizzle.execute(sql`SELECT id FROM "rollback_target"`)).rows,
         [{ id: 1 }]
       )
+
       const table = await query(`USE NS ${namespace} DB cms; INFO FOR TABLE rollback_related;`)
+
       assert.equal(Object.hasOwn(table.indexes, 'rollback_probe_idx'), true)
       assert.equal(Object.hasOwn(table.fields, 'name'), true)
       assert.equal(await count(payload, 'payload-migrations'), 3)
