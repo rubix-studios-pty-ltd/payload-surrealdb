@@ -42,28 +42,29 @@ type Definition = {
 
 type AddedColumn = { index: number; statement: string }
 
-export function inlineKeys(statement: string): string {
-  const statements = split(statement)
+export function inlineKeys(source: string): string {
+  const statements = split(source)
   const definitions = new Map<string, Definition>()
   const positions = new Map<number, Definition>()
   const indexed = new Set<string>()
 
-  for (const [index, entry] of statements.entries()) {
-    const table = identifierName(createTable.exec(entry)?.[1])
+  for (const [index, statement] of statements.entries()) {
+    const table = identifierName(createTable.exec(statement)?.[1])
 
     if (table !== undefined) {
       if (definitions.has(table)) {
-        return statement
+        return source
       }
 
-      const definition = { name: table, index, statement: entry, constraints: [] }
+      const definition: Definition = { name: table, index, statement, constraints: [] }
 
       definitions.set(table, definition)
       positions.set(index, definition)
+
       continue
     }
 
-    const owner = identifierName(createIndex.exec(entry)?.[1])
+    const owner = identifierName(createIndex.exec(statement)?.[1])
 
     if (owner !== undefined) {
       indexed.add(owner)
@@ -72,35 +73,36 @@ export function inlineKeys(statement: string): string {
 
   const inlined = new Set<number>()
   const addedColumns = new Map<string, Set<string>>()
-  
-  for (const [index, entry] of statements.entries()) {
-    const [, alteredTable, columnName] = addedColumnName.exec(entry) ?? []
+
+  for (const [index, statement] of statements.entries()) {
+    const [, alteredTable, columnName] = addedColumnName.exec(statement) ?? []
     const altered = identifierName(alteredTable)
     const column = identifierName(columnName)
-  
+
     if (altered !== undefined && column !== undefined) {
       const definition = definitions.get(altered)
-  
+
       if (definition && definition.index < index) {
         const columns = addedColumns.get(altered) ?? new Set<string>()
+
         columns.add(column)
         addedColumns.set(altered, columns)
       }
-  
+
       continue
     }
-  
-    const [, table, constraint] = addForeignKey.exec(entry) ?? []
+
+    const [, table, constraint] = addForeignKey.exec(statement) ?? []
     const owner = identifierName(table)
     const definition = owner === undefined ? undefined : definitions.get(owner)
-  
+
     if (!definition || !indexed.has(definition.name) || definition.index >= index || !constraint) {
       continue
     }
-  
+
     const sourceColumns = foreignKeyColumns.exec(constraint)?.[1]
     const laterColumns = addedColumns.get(definition.name)
-  
+
     if (
       !sourceColumns ||
       [...sourceColumns.matchAll(columnIdentifiers)].some(([name]) => {
@@ -110,13 +112,13 @@ export function inlineKeys(statement: string): string {
     ) {
       continue
     }
-  
+
     definition.constraints.push(constraint)
     inlined.add(index)
   }
 
   if (!inlined.size) {
-    return statement
+    return source
   }
 
   for (const group of tableGroups(statements, positions, definitions)) {
@@ -124,15 +126,16 @@ export function inlineKeys(statement: string): string {
       continue
     }
 
-    for (const [position, { constraints, statement }] of orderTables(
-      group,
-      definitions
-    ).entries()) {
-      const index = group[position]?.index
+    const ordered = orderTables(group, definitions)
 
-      if (index === undefined) {
+    for (const [position, { index }] of group.entries()) {
+      const definition = ordered[position]
+
+      if (!definition) {
         continue
       }
+
+      const { constraints, statement } = definition
 
       statements[index] = constraints.length
         ? `${statement.slice(0, -1).trimEnd()},\n  ${constraints.map(endLineComment).join(',\n  ')}\n)`
@@ -142,7 +145,7 @@ export function inlineKeys(statement: string): string {
 
   return statements
     .filter((_, index) => !inlined.has(index))
-    .map((entry) => `${endLineComment(entry)};`)
+    .map((statement) => `${endLineComment(statement)};`)
     .join('\n')
 }
 
@@ -160,6 +163,7 @@ export function inlineAddedKeys(statements: string[]): string[] {
 
       columns.set(column, { index, statement })
       pending.set(owner, columns)
+
       continue
     }
 

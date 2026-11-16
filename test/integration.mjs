@@ -22,7 +22,9 @@ async function waitForDatabase() {
       signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]),
     }).catch(() => undefined)
 
-    if (response?.ok) return
+    if (response?.ok) {
+      return
+    }
 
     await setTimeout(250, undefined, { signal })
   }
@@ -31,12 +33,22 @@ async function waitForDatabase() {
 }
 
 const { stdout } = await exec('docker', [
-  'run', '--rm', '-d',
-  '-p', '127.0.0.1:18000:8000',
+  'run',
+  '--rm',
+  '-d',
+  '-p',
+  '127.0.0.1:18000:8000',
   'surrealdb/surrealdb:v4.0.1',
-  'start', '--bind', '0.0.0.0:8000',
-  '--user', 'root', '--pass', password, 'memory',
+  'start',
+  '--bind',
+  '0.0.0.0:8000',
+  '--user',
+  'root',
+  '--pass',
+  password,
+  'memory',
 ])
+
 const container = stdout.trim()
 
 try {
@@ -54,7 +66,7 @@ try {
         },
         signal,
         stdio: 'inherit',
-      },
+      }
     )
 
     child.once('error', reject)

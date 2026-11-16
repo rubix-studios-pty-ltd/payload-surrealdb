@@ -25,6 +25,11 @@ type Database = NodePgDatabase<Record<string, unknown>>
 type Query = DBQueryConfig<'many', true>
 type Row = Record<string, unknown>
 
+type QueryBuilder = {
+  findFirst: (query?: Query) => unknown
+  findMany: (query?: Query) => unknown
+}
+
 type Join = {
   name: string
   target: TableRelationalConfig
@@ -45,13 +50,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
   bind(database)
 
   function bind(database: Database): void {
-    const queries = database.query as unknown as Record<
-      string,
-      {
-        findFirst: (query?: Query) => unknown
-        findMany: (query?: Query) => unknown
-      }
-    >
+    const queries = database.query as unknown as Record<string, QueryBuilder>
 
     for (const [name, table] of Object.entries(tables)) {
       const builder = queries[name]
@@ -142,7 +141,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
       await loadJoin(database, rows, join)
     }
 
-    const keep = new Set([
+    const outputKeys = new Set([
       ...selectedKeys,
       ...requiredKeys,
       ...Object.keys(extras ?? {}),
@@ -150,7 +149,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
     ])
 
     return rows.map((row) =>
-      Object.fromEntries(Object.entries(row).filter(([key]) => keep.has(key)))
+      Object.fromEntries(Object.entries(row).filter(([key]) => outputKeys.has(key)))
     )
   }
 
@@ -192,13 +191,13 @@ export function bindRelations(database: Database, schema: Record<string, unknown
 
   async function loadJoin(database: Database, rows: Row[], join: Join): Promise<void> {
     const { name, target, isOne, query, sourceKeys, targetKeys } = join
-    const parents = new Map<string, unknown[]>()
+    const parentKeys = new Map<string, unknown[]>()
 
     for (const row of rows) {
       const values = sourceKeys.map((key) => row[key])
 
       if (values.every((value) => value != null)) {
-        parents.set(joinKey(values), values)
+        parentKeys.set(joinKey(values), values)
       }
     }
 
@@ -219,9 +218,9 @@ export function bindRelations(database: Database, schema: Record<string, unknown
       throw new Error(`No target columns for Drizzle relation "${name}"`)
     }
 
-    const matches = new Map<string, Row[]>()
+    const matchesByParent = new Map<string, Row[]>()
 
-    for (const batch of batches([...parents.entries()])) {
+    for (const batch of batches([...parentKeys.entries()])) {
       if (query.limit !== undefined || query.offset !== undefined) {
         for (const [key, values] of batch) {
           const related = await selectRows(database, target, {
@@ -229,7 +228,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
             where: and(where, matchKeys(columns, values)),
           })
 
-          matches.set(key, related)
+          matchesByParent.set(key, related)
         }
 
         continue
@@ -250,27 +249,27 @@ export function bindRelations(database: Database, schema: Record<string, unknown
         { ...query, where: and(where, constraint) },
         targetKeys
       )
-      const keep = new Set(selectKeys(target.columns, query.columns))
+      const selectedKeys = new Set(selectKeys(target.columns, query.columns))
 
       for (const row of related) {
         const key = joinKey(targetKeys.map((field) => row[field]))
 
         for (const field of targetKeys) {
-          if (!keep.has(field)) {
+          if (!selectedKeys.has(field)) {
             delete row[field]
           }
         }
 
-        const group = matches.get(key) ?? []
+        const group = matchesByParent.get(key) ?? []
 
         group.push(row)
-        matches.set(key, group)
+        matchesByParent.set(key, group)
       }
     }
 
     for (const row of rows) {
       const key = joinKey(sourceKeys.map((field) => row[field]))
-      const related = matches.get(key) ?? []
+      const related = matchesByParent.get(key) ?? []
 
       row[name] = isOne ? (related[0] ?? null) : related
     }

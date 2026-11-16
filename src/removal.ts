@@ -12,6 +12,14 @@ const dropIndex = new RegExp(`^DROP INDEX ${table}$`, 'i')
 const dropColumn = new RegExp(`^ALTER TABLE ${table} DROP COLUMN ${name}$`, 'i')
 const dropConstraint = new RegExp(`^ALTER TABLE ${table} DROP CONSTRAINT ${name}$`, 'i')
 const dropType = new RegExp(`^DROP TYPE ${table}$`, 'i')
+const removalPatterns = [
+  disableSecurity,
+  dropTable,
+  dropIndex,
+  dropColumn,
+  dropConstraint,
+  dropType,
+]
 
 type Column = {
   table: string
@@ -32,15 +40,17 @@ export function planRemoval(sql: string): Removal | undefined {
 
   const statements = split(sql)
   const tables = matches(statements, dropTable, 1).map(([table]) => table)
-  const disabled = matches(statements, disableSecurity, 1).map(([table]) => table)
+  const disabledTables = matches(statements, disableSecurity, 1).map(([table]) => table)
 
-  if (!tables.length || !disabled.length || disabled.some((table) => !tables.includes(table))) {
+  if (
+    !tables.length ||
+    !disabledTables.length ||
+    disabledTables.some((table) => !tables.includes(table))
+  ) {
     return
   }
 
-  const patterns = [disableSecurity, dropTable, dropIndex, dropColumn, dropConstraint, dropType]
-
-  if (statements.some((statement) => !patterns.some((pattern) => pattern.test(statement)))) {
+  if (statements.some((statement) => !removalPatterns.some((pattern) => pattern.test(statement)))) {
     return
   }
 
@@ -51,7 +61,7 @@ export function planRemoval(sql: string): Removal | undefined {
   const constraints = matches(statements, dropConstraint, 2)
 
   for (const [table, constraint] of constraints) {
-    if (!columns.some((column) => matchesKey(column, table, constraint))) {
+    if (!columns.some((column) => isColumnForeignKey(column, table, constraint))) {
       return
     }
   }
@@ -68,7 +78,7 @@ export async function remove<T extends { rows: Record<string, unknown>[] }>(
   plan: Removal,
   execute: (query: SQL) => PromiseLike<T>
 ): Promise<T> {
-  const indexes: string[] = []
+  const removeIndexes: string[] = []
 
   for (const index of plan.indexes) {
     const { rows } = await execute(sql`
@@ -78,6 +88,7 @@ export async function remove<T extends { rows: Record<string, unknown>[] }>(
       JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
       WHERE idx.relname = ${index}
     `)
+
     const [row] = rows
 
     if (!row) {
@@ -88,11 +99,11 @@ export async function remove<T extends { rows: Record<string, unknown>[] }>(
       throw new Error(`Cannot identify the index to remove: ${index}`)
     }
 
-    indexes.push(`REMOVE INDEX IF EXISTS ${quote(index)} ON TABLE ${quote(row.table_name)}`)
+    removeIndexes.push(`REMOVE INDEX IF EXISTS ${quote(index)} ON TABLE ${quote(row.table_name)}`)
   }
 
   const statements = [
-    ...indexes,
+    ...removeIndexes,
     ...plan.columns.map(
       ({ table, name }) => `REMOVE FIELD IF EXISTS ${quote(name)} ON TABLE ${quote(table)}`
     ),
@@ -131,7 +142,7 @@ function matches(
   })
 }
 
-function matchesKey(column: Column, table: string, constraint: string): boolean {
+function isColumnForeignKey(column: Column, table: string, constraint: string): boolean {
   if (column.table !== table) {
     return false
   }
@@ -144,5 +155,5 @@ function matchesKey(column: Column, table: string, constraint: string): boolean 
 }
 
 function quote(identifier: string): string {
-  return String.fromCharCode(96) + identifier.replace(/[\x60\\]/g, '\\$&') + String.fromCharCode(96)
+  return `\`${identifier.replace(/[`\\]/g, '\\$&')}\``
 }
