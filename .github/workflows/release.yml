@@ -64,12 +64,14 @@ jobs:
             --env SURREAL_PASS \
             surrealdb/surrealdb:v4.0.1 \
             start --bind 0.0.0.0:8000 memory
-
+      
           curl --fail --silent --show-error \
-            --retry 20 \
-            --retry-connrefused \
-            --retry-delay 1 \
-            "$SURREAL_TEST_ENDPOINT/health"
+            --retry 30 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            --connect-timeout 2 \
+            --max-time 5 \
+            "$SURREAL_TEST_ENDPOINT/ready"
 
       - run: pnpm test:integration
 
