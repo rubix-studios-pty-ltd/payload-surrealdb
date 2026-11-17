@@ -103,6 +103,7 @@ test('lock filters target one relationship column for multiple document IDs', ()
 
 test('lock filters preserve unsupported and ambiguous predicates', () => {
   const adapter = createAdapter()
+
   const posts = {
     'document.relationTo': {
       equals: 'posts',

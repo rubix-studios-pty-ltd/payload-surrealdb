@@ -5,7 +5,7 @@ import toSnakeCase from 'to-snake-case'
 
 type SchemaHook = NonNullable<PostgresAdapterArgs['beforeSchemaInit']>[number]
 
-export const setSessionKeys: SchemaHook = ({ adapter, schema }) => {
+export const setSessions: SchemaHook = ({ adapter, schema }) => {
   for (const collection of adapter.payload.config.collections) {
     if (!collection.auth?.useSessions) {
       continue
@@ -16,14 +16,17 @@ export const setSessionKeys: SchemaHook = ({ adapter, schema }) => {
     const columns = sessions ? adapter.rawTables[sessions]?.columns : undefined
 
     if (columns?.id?.type === 'varchar') {
-      columns.id = { ...columns.id, type: 'uuid' }
+      columns.id = {
+        ...columns.id,
+        type: 'uuid',
+      }
     }
   }
 
   return schema
 }
 
-export const bindColumnTypes: SchemaHook = ({ adapter, schema }) => {
+export const bindColumns: SchemaHook = ({ adapter, schema }) => {
   for (const table of Object.values(schema.tables)) {
     for (const column of Object.values(getTableColumns(table))) {
       if (is(column, PgSerial) || is(column, PgSmallSerial)) {

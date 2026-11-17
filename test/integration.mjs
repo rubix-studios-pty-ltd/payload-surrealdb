@@ -3,6 +3,7 @@ import { setTimeout } from 'node:timers/promises'
 import { promisify } from 'node:util'
 
 const exec = promisify(execFile)
+
 const { SURREAL_TEST_ENDPOINT: configuredEndpoint, SURREAL_TEST_PASSWORD: configuredPassword } =
   process.env
 
@@ -11,8 +12,10 @@ if (Boolean(configuredEndpoint) !== Boolean(configuredPassword)) {
 }
 
 const password = configuredPassword || 'local-test-password'
+
 const controller = new AbortController()
 const { signal } = controller
+
 const interrupt = () => controller.abort()
 
 process.once('SIGINT', interrupt)
@@ -110,6 +113,7 @@ try {
 async function waitForDatabase(endpoint, container) {
   const url = new URL('/ready', endpoint)
   const deadline = Date.now() + 30_000
+
   let lastFailure
 
   while (Date.now() < deadline) {
@@ -140,6 +144,7 @@ async function waitForDatabase(endpoint, container) {
         '{{.State.Status}} (exit code {{.State.ExitCode}})',
         container,
       ])
+
       const status = stdout.trim()
 
       if (!status.startsWith('running ')) {

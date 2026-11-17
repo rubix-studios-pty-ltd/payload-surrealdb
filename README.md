@@ -76,6 +76,37 @@ In production, configure `prodMigrations` with the generated migration list to a
 
 Automatic startup migrations apply existing files. Changes to collections and globals still require `payload migrate:create`. To apply migrations manually, run `pnpm exec payload migrate`.
 
+### SurrealDB Cloud
+
+When developing locally against a hosted SurrealDB Cloud database, you can explicitly use secure WebSocket transport with root authentication.
+
+```typescript
+db: surrealdbAdapter({
+  pool: {
+    connectionString: process.env.DATABASE_URL!,
+    transport: 'ws',
+    auth: {
+      username: process.env.DATABASE_USERNAME!,
+      password: process.env.DATABASE_PASSWORD!,
+    },
+  },
+  push: false,
+  migrationDir: './src/migrations',
+}),
+```
+
+Configure the connection using environment variables.
+
+```text
+DATABASE_URL=surrealdb+wss://xxxxx.surrealdb.earth/<namespace>/<database>
+DATABASE_USERNAME=root
+DATABASE_PASSWORD=replace-with-your-password
+```
+
+The surrealdb+wss:// scheme enables TLS, while transport: 'ws' explicitly selects WebSocket transport instead of automatic transport selection.
+
+The namespace and database must already exist. With push: false, migrations must be applied manually or through an explicitly configured migration process.
+
 ### Destructive migrations
 
 Generated collection removals use the same WebSocket transaction as the rest of the migration and its history entry. When two new tables reference each other and need indexes on their foreign-key fields, put the foreign keys and indexes in separate migrations. Changes that add a foreign key and an index to an existing table may also need separate migrations.
@@ -104,16 +135,16 @@ SurrealDB can return SQLSTATE `40001` when two workers try to claim the same job
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For support or inquiries
+For support or inquiries:
 
-- LinkedIn - [rubixvi](https://www.linkedin.com/in/rubixvi/)
-- Website - [Rubix Studios](https://rubixstudios.com.au)
+- LinkedIn: [rubixvi](https://www.linkedin.com/in/rubixvi/)
+- Website: [Rubix Studios](https://rubixstudios.com.au)
 
 ## Author
 
 Rubix Studios  
-https://rubixstudios.com.au
+[https://rubixstudios.com.au](https://rubixstudios.com.au)

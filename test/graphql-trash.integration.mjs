@@ -15,7 +15,11 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
   const { connectionString, migrationDir, namespace } = await setupDatabase(t)
 
   const config = buildConfig({
-    db: surrealdbAdapter({ pool: connectionString, migrationDir, push: false }),
+    db: surrealdbAdapter({
+      pool: connectionString,
+      migrationDir,
+      push: false,
+    }),
     secret: 'local-validation-only',
     telemetry: false,
     collections: [
@@ -202,6 +206,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
       assert.equal(page.totalDocs, 2)
       assert.equal(page.totalPages, 2)
       assert.equal(page.hasNextPage, false)
+
       assert.equal(page.docs[0].title, 'Second article')
       assert.equal(page.docs[0].author.id, author.id)
       assert.equal(page.docs[0].author.name, 'GraphQL writer')
@@ -246,6 +251,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
       )
 
       assert.equal(deleteArticle.id, createArticle.id)
+
       await assert.rejects(
         payload.findByID({
           ...articles,
@@ -288,6 +294,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
       }
 
       assert.equal((await moveToTrash()).deletedAt, deletedAt)
+
       assert.equal(
         (
           await payload.find({
@@ -297,6 +304,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
         ).totalDocs,
         0
       )
+
       assert.equal(
         (
           await payload.count({
@@ -319,6 +327,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
         ...articles,
         trash: true,
       }
+
       const onlyTrashed = {
         and: [
           where,
@@ -339,6 +348,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
         ).docs[0].id,
         id
       )
+
       assert.equal(
         (
           await payload.count({
@@ -361,6 +371,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
 
       assert.equal(hidden.totalDocs, 0)
       assert.equal(visible.docs[0].title, title)
+
       assert.equal(new Date(visible.docs[0].deletedAt).toISOString(), deletedAt)
 
       const restored = await payload.update({
@@ -372,6 +383,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
       })
 
       assert.equal(restored.deletedAt, null)
+
       assert.equal(
         (
           await payload.findByID({
@@ -409,6 +421,7 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
         ).totalDocs,
         0
       )
+
       assert.equal((await payload.findVersions(history)).totalDocs, 0)
     }
   )

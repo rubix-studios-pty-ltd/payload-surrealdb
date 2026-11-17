@@ -1,7 +1,4 @@
-const quoted =
-  /[eE]'(?:[^'\\]|\\[\s\S]|'')*'|'(?:[^']|'')*'|"(?:[^"]|"")*"|(\$(?:[a-zA-Z_]\w*)?\$)[\s\S]*?\1|--[^\r\n]*|\/\*[\s\S]*?\*\//
-const tokens = new RegExp(`${quoted.source}|;`, 'g')
-const words = new RegExp(`${quoted.source}|([a-zA-Z_][\\w$]*)`, 'g')
+import { tokens, words } from './sql/statements.js'
 
 export function* keywordEnds(sql: string, keyword: string): Generator<number> {
   for (const token of sql.matchAll(words)) {
@@ -13,6 +10,7 @@ export function* keywordEnds(sql: string, keyword: string): Generator<number> {
 
 export function split(sql: string): string[] {
   const statements: string[] = []
+
   let start = 0
 
   for (const token of sql.matchAll(tokens)) {

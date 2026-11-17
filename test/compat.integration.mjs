@@ -11,7 +11,11 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
   const { connectionString, migrationDir, namespace, query } = await setupDatabase(t)
 
   const config = buildConfig({
-    db: surrealdbAdapter({ pool: connectionString, migrationDir, push: false }),
+    db: surrealdbAdapter({
+      pool: connectionString,
+      migrationDir,
+      push: false,
+    }),
     secret: 'local-validation-only',
     telemetry: false,
     localization: {
@@ -117,7 +121,9 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
     globals: [
       {
         slug: 'settings',
-        versions: { drafts: true },
+        versions: {
+          drafts: true,
+        },
         fields: [
           {
             name: 'title',
@@ -436,6 +442,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       const { db } = payload.db.sessions[transactionID]
 
       const execute = db.execute.bind(db)
+
       const failure = new Error('intentional commit failure')
 
       t.mock.method(db, 'execute', (query) => {
@@ -542,6 +549,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         history.docs.map(({ id }) => id),
         before.docs.map(({ id }) => id)
       )
+
       assert.equal(Object.keys(payload.db.sessions).length, 0)
     }
   })
@@ -611,6 +619,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
 
       assert.equal(found.totalDocs, 1)
       assert.equal(found.docs[0].id, post.id)
+
       assert.deepEqual(
         found.docs[0].related.map(({ relationTo, value }) => ({ relationTo, value: value.id })),
         related
@@ -636,6 +645,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         })
 
         assert.deepEqual(joined.posts.docs, [id])
+
         assert.equal(joined.posts.totalDocs, 2)
         assert.equal(joined.posts.hasNextPage, page === 1)
       }

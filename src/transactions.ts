@@ -9,7 +9,9 @@ export function bindTransactions(adapter: PostgresAdapter): void {
 
     const ready = Promise.withResolvers<Session['db']>()
     const finish = Promise.withResolvers<void>()
+
     const rollback = new Error('Payload transaction rolled back')
+
     const done = adapter.drizzle.transaction(async (db) => {
       ready.resolve(db)
       await finish.promise

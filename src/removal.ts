@@ -1,25 +1,17 @@
 import { type SQL, sql } from 'drizzle-orm'
 
 import { executeSurrealDDL } from './rpc.js'
-import { split } from './statements.js'
-
-const name = '"((?:[^"]|"")*)"'
-const table = `(?:"public"\\.)?${name}`
-
-const disableSecurity = new RegExp(`^ALTER TABLE ${table} DISABLE ROW LEVEL SECURITY$`, 'i')
-const dropTable = new RegExp(`^DROP TABLE ${table} CASCADE$`, 'i')
-const dropIndex = new RegExp(`^DROP INDEX ${table}$`, 'i')
-const dropColumn = new RegExp(`^ALTER TABLE ${table} DROP COLUMN ${name}$`, 'i')
-const dropConstraint = new RegExp(`^ALTER TABLE ${table} DROP CONSTRAINT ${name}$`, 'i')
-const dropType = new RegExp(`^DROP TYPE ${table}$`, 'i')
-const removalPatterns = [
+import {
+  disabledSecurity,
   disableSecurity,
-  dropTable,
-  dropIndex,
   dropColumn,
   dropConstraint,
+  dropIndex,
+  dropTable,
   dropType,
-]
+  removalPatterns,
+} from './sql/removal.js'
+import { split } from './statements.js'
 
 type Column = {
   table: string
@@ -34,7 +26,7 @@ type Removal = {
 }
 
 export function planRemoval(sql: string): Removal | undefined {
-  if (!/\bDISABLE ROW LEVEL SECURITY\b/i.test(sql)) {
+  if (!disabledSecurity.test(sql)) {
     return
   }
 
