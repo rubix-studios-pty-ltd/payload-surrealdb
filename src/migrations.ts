@@ -8,6 +8,7 @@ import { is, type SQLWrapper, StringChunk, sql } from 'drizzle-orm'
 import { dropSchema } from './drop.js'
 import { inlineAddedKeys, inlineKeys } from './initial.js'
 import { planRemoval, remove } from './removal.js'
+import { filePattern } from './sql/migration.js'
 import { split } from './statements.js'
 
 type Mode = 'migrate' | 'down' | 'fresh'
@@ -24,7 +25,6 @@ const surrealHistory = `
     AND table_name = 'payload_migrations';
 `.trim()
 
-const filePattern = /^\d{8}_\d{6}(?:_\w+)?\.ts$/
 const scope = new AsyncLocalStorage<Mode>()
 
 export function bindDatabase(adapter: PostgresAdapter): void {
