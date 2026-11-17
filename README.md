@@ -104,16 +104,16 @@ SurrealDB can return SQLSTATE `40001` when two workers try to claim the same job
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For support or inquiries
+For support or inquiries:
 
-- LinkedIn - [rubixvi](https://www.linkedin.com/in/rubixvi/)
-- Website - [Rubix Studios](https://rubixstudios.com.au)
+- LinkedIn: [rubixvi](https://www.linkedin.com/in/rubixvi/)
+- Website: [Rubix Studios](https://rubixstudios.com.au)
 
 ## Author
 
 Rubix Studios  
-https://rubixstudios.com.au
+[https://rubixstudios.com.au](https://rubixstudios.com.au)
