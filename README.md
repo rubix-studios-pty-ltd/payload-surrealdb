@@ -98,6 +98,8 @@ To use an existing SurrealDB test server, set `SURREAL_TEST_ENDPOINT` and `SURRE
 
 The smoke tests exercise authenticated REST requests, multipart uploads and downloads, document locks, relationship filters and joins, localized drafts, and version history. Transaction checks verify that a failed hook rolls back document updates, related writes, and version entries together. The job suite runs two workers against the same queue and verifies that a contested claim executes once and leaves scheduled jobs pending. The migration suite exercises migration generation, startup, rollback, and reapplication.
 
+The GraphQL suite executes Payload's generated schema and checks authentication, access filters, mutations and relationship pagination. Trash tests cover default visibility, restore, permanent deletion and version cleanup. The plugin suite exercises Nested Docs breadcrumb updates, Redirects destination types and source uniqueness, and Search index synchronization.
+
 SurrealDB can return SQLSTATE `40001` when two workers try to claim the same job. The worker can poll again after a claim transaction fails with that error.
 
 ## License

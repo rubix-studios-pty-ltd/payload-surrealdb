@@ -48,6 +48,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
 
   await t.test('startup applies a pending migration only when push is enabled', async () => {
     const options = { connectionString, migrationDir, withTags: false }
+
     const generator = await getPayload({
       config: await makeConfig({ ...options, push: false }),
       key: `${namespace}_generator`,
@@ -63,6 +64,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     }
 
     const initialFile = (await readdir(migrationDir)).find((file) => file.endsWith('_initial.ts'))
+
     assert.ok(initialFile, 'Expected a generated initial migration')
 
     const disabled = await getPayload({
@@ -260,7 +262,10 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       overrideAccess: true,
     })
 
-    const { token } = await payload.login({ collection: 'users', data })
+    const { token } = await payload.login({
+      collection: 'users',
+      data,
+    })
 
     assert.ok(token)
 

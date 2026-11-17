@@ -14,19 +14,42 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
   const executions = new Map()
 
   const config = buildConfig({
-    db: surrealdbAdapter({ pool: connectionString, migrationDir, push: false }),
+    db: surrealdbAdapter({
+      pool: connectionString,
+      migrationDir,
+      push: false,
+    }),
     secret: 'local-validation-only',
     telemetry: false,
     collections: [
-      { slug: 'users', auth: true, fields: [] },
+      {
+        slug: 'users',
+        auth: true,
+        fields: [],
+      },
       {
         slug: 'media',
-        upload: { mimeTypes: ['text/plain'], staticDir },
-        fields: [{ name: 'label', type: 'text', required: true }],
+        upload: {
+          mimeTypes: ['text/plain'],
+          staticDir,
+        },
+        fields: [
+          {
+            name: 'label',
+            type: 'text',
+            required: true,
+          },
+        ],
       },
       {
         slug: 'articles',
-        fields: [{ name: 'attachment', type: 'upload', relationTo: 'media' }],
+        fields: [
+          {
+            name: 'attachment',
+            type: 'upload',
+            relationTo: 'media',
+          },
+        ],
       },
     ],
     jobs: {
@@ -34,8 +57,20 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
       tasks: [
         {
           slug: 'record-work',
-          inputSchema: [{ name: 'name', type: 'text', required: true }],
-          outputSchema: [{ name: 'name', type: 'text', required: true }],
+          inputSchema: [
+            {
+              name: 'name',
+              type: 'text',
+              required: true,
+            },
+          ],
+          outputSchema: [
+            {
+              name: 'name',
+              type: 'text',
+              required: true,
+            },
+          ],
           handler: ({ input }) => {
             executions.set(input.name, (executions.get(input.name) ?? 0) + 1)
 
@@ -53,9 +88,22 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
   await migrateInitial(payload)
 
   await t.test('stores, serves, populates and deletes a multipart upload', async () => {
-    const credentials = { email: 'uploader@example.invalid', password: 'local-test-password' }
-    await payload.create({ collection: 'users', data: credentials, overrideAccess: true })
-    const { token } = await payload.login({ collection: 'users', data: credentials })
+    const credentials = {
+      email: 'uploader@example.invalid',
+      password: 'local-test-password',
+    }
+
+    await payload.create({
+      collection: 'users',
+      data: credentials,
+      overrideAccess: true,
+    })
+
+    const { token } = await payload.login({
+      collection: 'users',
+      data: credentials,
+    })
+
     assert.ok(token)
 
     function request(path, options = {}) {
@@ -65,7 +113,10 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
         request: new Request(new URL(path, 'http://localhost'), {
           method: options.method,
           body: options.body,
-          headers: { authorization: `JWT ${token}`, ...options.headers },
+          headers: {
+            authorization: `JWT ${token}`,
+            ...options.headers,
+          },
         }),
       })
     }
@@ -75,17 +126,37 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
 
     const form = new FormData()
 
-    form.set('_payload', JSON.stringify({ label: 'Test attachment' }))
-    form.set('file', new Blob([contents], { type: 'text/plain' }), filename)
+    form.set(
+      '_payload',
+      JSON.stringify({
+        label: 'Test attachment',
+      })
+    )
 
-    const create = await request('/api/media', { method: 'POST', body: form })
+    form.set(
+      'file',
+      new Blob([contents], {
+        type: 'text/plain',
+      }),
+      filename
+    )
+
+    const create = await request('/api/media', {
+      method: 'POST',
+      body: form,
+    })
+
     const response = await create.json()
 
     assert.equal(create.status, 201, JSON.stringify(response))
 
     const { id } = response.doc
 
-    const file = await payload.findByID({ collection: 'media', id, overrideAccess: true })
+    const file = await payload.findByID({
+      collection: 'media',
+      id,
+      overrideAccess: true,
+    })
 
     assert.equal(file.filename, filename)
     assert.equal(file.mimeType, 'text/plain')
@@ -97,14 +168,20 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
     assert.equal(download.status, 200)
     assert.equal(await download.text(), contents)
 
-    const range = await request(file.url, { headers: { range: 'bytes=0-8' } })
+    const range = await request(file.url, {
+      headers: {
+        range: 'bytes=0-8',
+      },
+    })
 
     assert.equal(range.status, 206)
     assert.equal(await range.text(), 'SurrealDB')
 
     const article = await payload.create({
       collection: 'articles',
-      data: { attachment: id },
+      data: {
+        attachment: id,
+      },
       depth: 1,
       overrideAccess: true,
     })
@@ -124,14 +201,24 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
       overrideAccess: true,
     })
 
-    await assert.rejects(readFile(join(staticDir, filename)), { code: 'ENOENT' })
-    await assert.rejects(payload.findByID({ collection: 'media', id, overrideAccess: true }), {
-      status: 404,
+    await assert.rejects(readFile(join(staticDir, filename)), {
+      code: 'ENOENT',
     })
+    await assert.rejects(
+      payload.findByID({
+        collection: 'media',
+        id,
+        overrideAccess: true,
+      }),
+      {
+        status: 404,
+      }
+    )
   })
 
   await t.test('workers claim a queued job once and leave scheduled jobs pending', async (t) => {
     const worker = await getPayload({ config, key: `${namespace}_worker` })
+
     t.after(() => worker.destroy())
 
     const queue = 'concurrent'
@@ -140,14 +227,18 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
     const ready = await payload.jobs.queue({
       task,
       queue,
-      input: { name: 'ready' },
+      input: {
+        name: 'ready',
+      },
       overrideAccess: true,
     })
 
     const scheduled = await payload.jobs.queue({
       task,
       queue,
-      input: { name: 'scheduled' },
+      input: {
+        name: 'scheduled',
+      },
       overrideAccess: true,
       waitUntil: new Date(Date.now() + 3_600_000),
     })
@@ -173,13 +264,22 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
     assert.deepEqual([...executions], [['ready', 1]])
 
     const collection = 'payload-jobs'
-    const completed = await payload.findByID({ collection, id: ready.id, overrideAccess: true })
+
+    const completed = await payload.findByID({
+      collection,
+      id: ready.id,
+      overrideAccess: true,
+    })
 
     assert.ok(completed.completedAt)
     assert.equal(completed.totalTried, 1)
     assert.deepEqual(completed.log[0].output, { name: 'ready' })
 
-    const pending = await payload.findByID({ collection, id: scheduled.id, overrideAccess: true })
+    const pending = await payload.findByID({
+      collection,
+      id: scheduled.id,
+      overrideAccess: true,
+    })
 
     assert.equal(pending.completedAt ?? null, null)
     assert.equal(pending.totalTried, 0)

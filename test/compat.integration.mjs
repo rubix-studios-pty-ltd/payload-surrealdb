@@ -111,7 +111,10 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
   const otherEditor = await payload.create({
     overrideAccess: true,
     collection: 'users',
-    data: { ...credentials, email: 'other@example.invalid' },
+    data: {
+      ...credentials,
+      email: 'other@example.invalid',
+    },
   })
 
   await t.test(
@@ -130,6 +133,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       assert.ok(token)
 
       const create = await request('posts', { method: 'POST', token, data: { title: 'REST post' } })
+
       const body = await create.json()
 
       assert.equal(create.status, 201, JSON.stringify(body))
@@ -151,18 +155,23 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
   await t.test('list and detail lock status use the right collection and owner', async () => {
     const collection = 'posts'
     const slug = 'payload-locked-documents'
+
     const owner = { ...editor, collection: 'users' }
 
     const locked = await payload.create({
       overrideAccess: true,
       collection,
-      data: { title: 'Locked post' },
+      data: {
+        title: 'Locked post',
+      },
     })
 
     const unlocked = await payload.create({
       overrideAccess: true,
       collection,
-      data: { title: 'Unlocked post' },
+      data: {
+        title: 'Unlocked post',
+      },
     })
 
     const otherLock = await payload.create({
@@ -170,7 +179,10 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       collection: slug,
       data: {
         globalSlug: 'settings',
-        user: { relationTo: 'users', value: otherEditor.id },
+        user: {
+          relationTo: 'users',
+          value: otherEditor.id,
+        },
       },
     })
 
@@ -178,8 +190,14 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       overrideAccess: true,
       collection: slug,
       data: {
-        document: { relationTo: collection, value: locked.id },
-        user: { relationTo: 'users', value: owner.id },
+        document: {
+          relationTo: collection,
+          value: locked.id,
+        },
+        user: {
+          relationTo: 'users',
+          value: owner.id,
+        },
       },
     })
 
@@ -190,7 +208,11 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       user: otherEditor,
       depth: 0,
       sort: 'id',
-      where: { id: { in: [locked.id, unlocked.id] } },
+      where: {
+        id: {
+          in: [locked.id, unlocked.id],
+        },
+      },
     })
 
     assert.deepEqual(
@@ -215,15 +237,26 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
     const edit = { collection, id: locked.id, data: { title: 'Edited post' }, overrideLock: false }
 
     await assert.rejects(
-      payload.update({ overrideAccess: true, ...edit, user: otherEditor }),
+      payload.update({
+        overrideAccess: true,
+        ...edit,
+        user: otherEditor,
+      }),
       /currently locked/
     )
-
-    const updated = await payload.update({ overrideAccess: true, ...edit, user: owner })
+    const updated = await payload.update({
+      overrideAccess: true,
+      ...edit,
+      user: owner,
+    })
 
     assert.equal(updated.title, 'Edited post')
 
-    const remaining = await payload.find({ overrideAccess: true, collection: slug, depth: 0 })
+    const remaining = await payload.find({
+      overrideAccess: true,
+      collection: slug,
+      depth: 0,
+    })
 
     assert.deepEqual(
       remaining.docs.map(({ id }) => id),
@@ -245,11 +278,17 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         const author = await payload.create({
           overrideAccess: true,
           collection,
-          data: { name: commit ? 'Committed author' : 'Rolled back author' },
+          data: {
+            name: commit ? 'Committed author' : 'Rolled back author',
+          },
           req,
         })
 
-        const where = { id: { equals: author.id } }
+        const where = {
+          id: {
+            equals: author.id,
+          },
+        }
 
         assert.equal(
           (await payload.count({ overrideAccess: true, collection, where, req })).totalDocs,
@@ -267,7 +306,13 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         }
 
         assert.equal(
-          (await payload.count({ overrideAccess: true, collection, where })).totalDocs,
+          (
+            await payload.count({
+              overrideAccess: true,
+              collection,
+              where,
+            })
+          ).totalDocs,
           Number(commit)
         )
       } finally {
@@ -286,8 +331,12 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       const author = await payload.create({
         overrideAccess: true,
         collection,
-        data: { name: 'Uncommitted author' },
-        req: { transactionID },
+        data: {
+          name: 'Uncommitted author',
+        },
+        req: {
+          transactionID,
+        },
       })
 
       const { db } = payload.db.sessions[transactionID]
@@ -308,11 +357,17 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         (error) => error === failure
       )
       assert.equal(payload.db.sessions[transactionID], undefined)
+
       const result = await payload.count({
         overrideAccess: true,
         collection,
-        where: { id: { equals: author.id } },
+        where: {
+          id: {
+            equals: author.id,
+          },
+        },
       })
+
       assert.equal(result.totalDocs, 0)
     } finally {
       await payload.db.rollbackTransaction(transactionID)
@@ -320,10 +375,29 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
   })
 
   await t.test('a failed hook rolls back the document, related write and version', async () => {
-    const local = { collection: 'posts', overrideAccess: true }
-    const post = await payload.create({ ...local, data: { title: 'Original title' } })
-    const where = { parent: { equals: post.id } }
-    const before = await payload.findVersions({ ...local, where })
+    const local = {
+      collection: 'posts',
+      overrideAccess: true,
+    }
+
+    const post = await payload.create({
+      ...local,
+      data: {
+        title: 'Original title',
+      },
+    })
+
+    const where = {
+      parent: {
+        equals: post.id,
+      },
+    }
+
+    const before = await payload.findVersions({
+      ...local,
+      where,
+    })
+
     assert.equal(before.totalDocs, 1)
 
     for (const draft of [false, true]) {
@@ -333,25 +407,42 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         payload.update({
           ...local,
           id: post.id,
-          context: { rollbackProbe: true },
-          data: { title },
+          context: {
+            rollbackProbe: true,
+          },
+          data: {
+            title,
+          },
           draft,
         }),
         (error) => error === hookFailure
       )
 
-      const current = await payload.findByID({ ...local, id: post.id, draft })
+      const current = await payload.findByID({
+        ...local,
+        id: post.id,
+        draft,
+      })
 
       assert.equal(current.title, post.title)
 
       const related = await payload.count({
         collection: 'authors',
         overrideAccess: true,
-        where: { name: { equals: title } },
+        where: {
+          name: {
+            equals: title,
+          },
+        },
       })
+
       assert.equal(related.totalDocs, 0)
 
-      const history = await payload.findVersions({ ...local, where })
+      const history = await payload.findVersions({
+        ...local,
+        where,
+      })
+
       assert.deepEqual(
         history.docs.map(({ id }) => id),
         before.docs.map(({ id }) => id)
@@ -383,20 +474,34 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       const post = await payload.create({
         overrideAccess: true,
         collection: 'posts',
-        data: { title: 'Alpha post', author: author.id, related },
+        data: {
+          title: 'Alpha post',
+          author: author.id,
+          related,
+        },
       })
 
       const second = await payload.create({
         overrideAccess: true,
         collection: 'posts',
-        data: { title: 'Beta post', author: author.id },
+        data: {
+          title: 'Beta post',
+          author: author.id,
+        },
       })
 
       const found = await payload.find({
         overrideAccess: true,
         collection: 'posts',
         depth: 1,
-        where: { related: { equals: { relationTo: 'authors', value: author.id } } },
+        where: {
+          related: {
+            equals: {
+              relationTo: 'authors',
+              value: author.id,
+            },
+          },
+        },
       })
 
       assert.equal(found.totalDocs, 1)
@@ -415,7 +520,14 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
           collection: 'authors',
           id: author.id,
           depth: 0,
-          joins: { posts: { count: true, limit: 1, page, sort: 'title' } },
+          joins: {
+            posts: {
+              count: true,
+              limit: 1,
+              page,
+              sort: 'title',
+            },
+          },
         })
 
         assert.deepEqual(joined.posts.docs, [id])
@@ -430,11 +542,15 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
     async () => {
       const collection = 'posts'
       const slug = 'settings'
+
       const post = await payload.create({
         overrideAccess: true,
         collection,
         locale: 'en',
-        data: { title: 'Versioned post', summary: 'Published' },
+        data: {
+          title: 'Versioned post',
+          summary: 'Published',
+        },
       })
 
       await payload.update({
@@ -442,7 +558,9 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         collection,
         id: post.id,
         locale: 'fr',
-        data: { summary: 'Publié' },
+        data: {
+          summary: 'Publié',
+        },
       })
 
       for (const summary of ['Premier brouillon', 'Dernier brouillon']) {
@@ -457,8 +575,14 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       }
 
       assert.equal(
-        (await payload.findByID({ overrideAccess: true, collection, id: post.id, locale: 'fr' }))
-          .summary,
+        (
+          await payload.findByID({
+            overrideAccess: true,
+            collection,
+            id: post.id,
+            locale: 'fr',
+          })
+        ).summary,
         'Publié'
       )
 
@@ -467,7 +591,11 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         collection,
         locale: 'fr',
         draft: true,
-        where: { summary: { equals: 'Dernier brouillon' } },
+        where: {
+          summary: {
+            equals: 'Dernier brouillon',
+          },
+        },
       })
 
       assert.deepEqual(
@@ -479,7 +607,11 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         overrideAccess: true,
         collection,
         locale: 'fr',
-        where: { parent: { equals: post.id } },
+        where: {
+          parent: {
+            equals: post.id,
+          },
+        },
       })
 
       assert.equal(versions.totalDocs, 4)
@@ -494,20 +626,36 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       await payload.updateGlobal({
         overrideAccess: true,
         slug,
-        data: { title: 'Draft settings' },
+        data: {
+          title: 'Draft settings',
+        },
         draft: true,
       })
 
       assert.equal(
-        (await payload.findGlobal({ overrideAccess: true, slug })).title,
+        (
+          await payload.findGlobal({
+            overrideAccess: true,
+            slug,
+          })
+        ).title,
         'Published settings'
       )
       assert.equal(
-        (await payload.findGlobal({ overrideAccess: true, slug, draft: true })).title,
+        (
+          await payload.findGlobal({
+            overrideAccess: true,
+            slug,
+            draft: true,
+          })
+        ).title,
         'Draft settings'
       )
 
-      const history = await payload.findGlobalVersions({ overrideAccess: true, slug })
+      const history = await payload.findGlobalVersions({
+        overrideAccess: true,
+        slug,
+      })
 
       assert.equal(history.totalDocs, 2)
       assert.equal(history.docs[0].version.title, 'Draft settings')
