@@ -3,11 +3,12 @@ import { test } from 'node:test'
 import { buildConfig, getPayload, handleEndpoints } from 'payload'
 import { surrealdbAdapter } from '@rubixstudios/payload-surrealdb'
 
-import { setupDatabase } from './database.mjs'
+import { migrateInitial, setupDatabase } from './database.mjs'
+
+const hookFailure = new Error('intentional afterChange failure')
 
 test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
   const { connectionString, migrationDir, namespace, query } = await setupDatabase(t)
-
   const config = buildConfig({
     db: surrealdbAdapter({ pool: connectionString, migrationDir, push: false }),
     secret: 'local-validation-only',
@@ -25,6 +26,35 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       { slug: 'topics', fields: [{ name: 'label', type: 'text', required: true }] },
       {
         slug: 'posts',
+        hooks: {
+          afterChange: [
+            async ({ context, doc, req }) => {
+              if (!context.rollbackProbe) {
+                return
+              }
+
+              await req.payload.create({
+                collection: 'authors',
+                data: { name: doc.title },
+                overrideAccess: true,
+                req,
+              })
+
+              const versions = await req.payload.findVersions({
+                collection: 'posts',
+                overrideAccess: true,
+                req,
+                where: {
+                  parent: { equals: doc.id },
+                  'version.title': { equals: doc.title },
+                },
+              })
+              assert.equal(versions.totalDocs, 1)
+
+              throw hookFailure
+            },
+          ],
+        },
         versions: { drafts: true },
         fields: [
           { name: 'title', type: 'text', required: true },
@@ -51,13 +81,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
   const payload = await getPayload({ config, key: namespace })
   t.after(() => payload.destroy())
 
-  await payload.db.createMigration({
-    migrationName: 'initial',
-    payload,
-    forceAcceptWarning: true,
-  })
-
-  await payload.db.migrate()
+  await migrateInitial(payload)
 
   function request(path, options = {}) {
     const { method = 'GET', data, token } = options
@@ -128,6 +152,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
     const collection = 'posts'
     const slug = 'payload-locked-documents'
     const owner = { ...editor, collection: 'users' }
+
     const locked = await payload.create({
       overrideAccess: true,
       collection,
@@ -216,6 +241,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
 
       try {
         const req = { transactionID }
+
         const author = await payload.create({
           overrideAccess: true,
           collection,
@@ -252,11 +278,11 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
 
   await t.test('Payload reports a failed commit and rolls back the write', async (t) => {
     const transactionID = await payload.db.beginTransaction()
-
     assert.ok(transactionID)
 
     try {
       const collection = 'authors'
+
       const author = await payload.create({
         overrideAccess: true,
         collection,
@@ -290,6 +316,47 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       assert.equal(result.totalDocs, 0)
     } finally {
       await payload.db.rollbackTransaction(transactionID)
+    }
+  })
+
+  await t.test('a failed hook rolls back the document, related write and version', async () => {
+    const local = { collection: 'posts', overrideAccess: true }
+    const post = await payload.create({ ...local, data: { title: 'Original title' } })
+    const where = { parent: { equals: post.id } }
+    const before = await payload.findVersions({ ...local, where })
+    assert.equal(before.totalDocs, 1)
+
+    for (const draft of [false, true]) {
+      const title = draft ? 'Aborted draft' : 'Aborted publication'
+
+      await assert.rejects(
+        payload.update({
+          ...local,
+          id: post.id,
+          context: { rollbackProbe: true },
+          data: { title },
+          draft,
+        }),
+        (error) => error === hookFailure
+      )
+
+      const current = await payload.findByID({ ...local, id: post.id, draft })
+
+      assert.equal(current.title, post.title)
+
+      const related = await payload.count({
+        collection: 'authors',
+        overrideAccess: true,
+        where: { name: { equals: title } },
+      })
+      assert.equal(related.totalDocs, 0)
+
+      const history = await payload.findVersions({ ...local, where })
+      assert.deepEqual(
+        history.docs.map(({ id }) => id),
+        before.docs.map(({ id }) => id)
+      )
+      assert.equal(Object.keys(payload.db.sessions).length, 0)
     }
   })
 
@@ -435,7 +502,6 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         (await payload.findGlobal({ overrideAccess: true, slug })).title,
         'Published settings'
       )
-
       assert.equal(
         (await payload.findGlobal({ overrideAccess: true, slug, draft: true })).title,
         'Draft settings'

@@ -96,7 +96,9 @@ Run `pnpm test` for the build and unit tests. Run `pnpm test:integration` for th
 
 To use an existing SurrealDB test server, set `SURREAL_TEST_ENDPOINT` and `SURREAL_TEST_PASSWORD`. The harness uses the root account to create and remove a unique namespace for each suite.
 
-The smoke tests exercise authenticated REST requests, document locks, transaction visibility and failure handling, relationship filters and joins, localized drafts, and collection and global versions. The migration suite exercises migration generation, startup, rollback, and reapplication.
+The smoke tests exercise authenticated REST requests, multipart uploads and downloads, document locks, relationship filters and joins, localized drafts, and version history. Transaction checks verify that a failed hook rolls back document updates, related writes, and version entries together. The job suite runs two workers against the same queue and verifies that a contested claim executes once and leaves scheduled jobs pending. The migration suite exercises migration generation, startup, rollback, and reapplication.
+
+SurrealDB can return SQLSTATE `40001` when two workers try to claim the same job. The worker can poll again after a claim transaction fails with that error.
 
 ## License
 

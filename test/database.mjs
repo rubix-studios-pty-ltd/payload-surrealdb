@@ -52,3 +52,12 @@ export async function setupDatabase(t) {
 
   return { connectionString, migrationDir, namespace, query }
 }
+
+export async function migrateInitial(payload) {
+  await payload.db.createMigration({
+    migrationName: 'initial',
+    payload,
+    forceAcceptWarning: true,
+  })
+  await payload.db.migrate()
+}

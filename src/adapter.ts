@@ -3,7 +3,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { bindConnection } from './connect.js'
 import { bindLocks } from './locks.js'
 import { bindMigrations } from './migrations.js'
-import { setSessionKeys } from './schema.js'
+import { bindColumnTypes, setSessionKeys } from './schema.js'
 import { bindTransactions } from './transactions.js'
 import { type SurrealDBAdapterArgs } from './types.js'
 
@@ -20,6 +20,7 @@ export function surrealdbAdapter(args: SurrealDBAdapterArgs): ReturnType<typeof 
 
   const upstream = postgresAdapter({
     ...options,
+    afterSchemaInit: [...(options.afterSchemaInit ?? []), bindColumnTypes],
     beforeSchemaInit: [setSessionKeys, ...(options.beforeSchemaInit ?? [])],
     disableCreateDatabase: true,
     pool: {
