@@ -254,7 +254,7 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
         const error = result.reason.cause ?? result.reason
 
         assert.equal(error.code, '40001', result.reason.stack)
-        
+
         await workers[index].jobs.run(options)
       }
     }
