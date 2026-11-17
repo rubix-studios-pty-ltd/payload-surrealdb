@@ -1,6 +1,6 @@
 {
   "name": "@rubixstudios/payload-surrealdb",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "SurrealDB adapter for Payload CMS",
   "license": "MIT",
   "author": "Rubix Studios <hello@rubixstudios.com.au> (https://rubixstudios.com.au)",
