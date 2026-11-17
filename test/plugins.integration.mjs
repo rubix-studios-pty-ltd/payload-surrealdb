@@ -124,8 +124,14 @@ test('official Payload plugins on SurrealDB', { timeout: 90_000 }, async (t) => 
       const path = (doc) => doc.breadcrumbs.map(({ label, url }) => ({ label, url }))
 
       assert.deepEqual(path(child), [
-        { label: 'Support', url: '/support' },
-        { label: 'Setup', url: '/support/setup' },
+        {
+          label: 'Support',
+          url: '/support',
+        },
+        {
+          label: 'Setup',
+          url: '/support/setup',
+        },
       ])
 
       await payload.update({
@@ -144,9 +150,18 @@ test('official Payload plugins on SurrealDB', { timeout: 90_000 }, async (t) => 
 
       assert.equal(moved.parent, section.id)
       assert.deepEqual(path(moved), [
-        { label: 'Services', url: '/services' },
-        { label: 'Support', url: '/services/support' },
-        { label: 'Setup', url: '/services/support/setup' },
+        {
+          label: 'Services',
+          url: '/services',
+        },
+        {
+          label: 'Support',
+          url: '/services/support',
+        },
+        {
+          label: 'Setup',
+          url: '/services/support/setup',
+        },
       ])
     }
   )

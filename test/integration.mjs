@@ -39,7 +39,12 @@ try {
         '0.0.0.0:8000',
         'memory',
       ],
-      { env: { ...process.env, SURREAL_PASS: password } }
+      {
+        env: {
+          ...process.env,
+          SURREAL_PASS: password,
+        },
+      }
     )
 
     container = stdout.trim()

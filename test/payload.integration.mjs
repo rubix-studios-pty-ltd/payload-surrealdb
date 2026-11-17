@@ -120,7 +120,9 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     async () => {
       await base.create({
         collection: 'posts',
-        data: { title: 'Post before refresh' },
+        data: {
+          title: 'Post before refresh',
+        },
         overrideAccess: true,
       })
 
@@ -159,13 +161,18 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
   await t.test('CRUD, ordered relationship population, pagination and global reads', async () => {
     const author = await payload.create({
       collection: 'authors',
-      data: { name: 'Example Author' },
+      data: {
+        name: 'Example Author',
+      },
       overrideAccess: true,
     })
 
     const tag = await payload.create({
       collection: 'tags',
-      data: { label: 'News', color: 'blue' },
+      data: {
+        label: 'News',
+        color: 'blue',
+      },
       overrideAccess: true,
     })
 
@@ -176,7 +183,14 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
         author: author.id,
         reviewers: [author.id],
         tags: [tag.id],
-        sections: [{ heading: 'First' }, { heading: 'Second' }],
+        sections: [
+          {
+            heading: 'First',
+          },
+          {
+            heading: 'Second',
+          },
+        ],
       },
       overrideAccess: true,
     })
@@ -184,7 +198,9 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     const edited = await payload.update({
       collection: 'posts',
       id: post.id,
-      data: { title: 'Revised post' },
+      data: {
+        title: 'Revised post',
+      },
       overrideAccess: true,
     })
 
@@ -192,8 +208,17 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
 
     const result = await payload.find({
       collection: 'posts',
-      where: { title: { equals: 'Revised post' } },
-      select: { title: true, author: true, tags: true, sections: true },
+      where: {
+        title: {
+          equals: 'Revised post',
+        },
+      },
+      select: {
+        title: true,
+        author: true,
+        tags: true,
+        sections: true,
+      },
       depth: 1,
       limit: 1,
       page: 1,
@@ -232,7 +257,9 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
 
     const draft = await payload.create({
       collection: 'posts',
-      data: { title: 'Draft' },
+      data: {
+        title: 'Draft',
+      },
       draft: true,
       overrideAccess: true,
     })
@@ -254,7 +281,10 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
   })
 
   await t.test('login creates a session and a failed SQL transaction rolls back', async () => {
-    const data = { email: 'local@example.invalid', password: 'local-test-password' }
+    const data = {
+      email: 'local@example.invalid',
+      password: 'local-test-password',
+    }
 
     await payload.create({
       collection: 'users',
@@ -293,12 +323,18 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     `)
 
       const parents = pgTable('bigint_parents', {
-        id: bigint('id', { mode: 'bigint' }).primaryKey(),
+        id: bigint('id', {
+          mode: 'bigint',
+        }).primaryKey(),
       })
 
       const children = pgTable('bigint_children', {
-        id: bigint('id', { mode: 'bigint' }).primaryKey(),
-        parentID: bigint('parent_id', { mode: 'bigint' }),
+        id: bigint('id', {
+          mode: 'bigint',
+        }).primaryKey(),
+        parentID: bigint('parent_id', {
+          mode: 'bigint',
+        }),
       })
 
       const schema = {
@@ -306,7 +342,10 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
         children,
         parentsRelations: relations(parents, ({ many }) => ({ children: many(children) })),
         childrenRelations: relations(children, ({ one }) => ({
-          parent: one(parents, { fields: [children.parentID], references: [parents.id] }),
+          parent: one(parents, {
+            fields: [children.parentID],
+            references: [parents.id],
+          }),
         })),
       }
 
@@ -316,7 +355,13 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
 
       const rows = await db.query.parents.findMany({
         orderBy: [parents.id],
-        with: { children: { columns: { id: true } } },
+        with: {
+          children: {
+            columns: {
+              id: true,
+            },
+          },
+        },
       })
 
       assert.deepEqual(rows, [
@@ -327,14 +372,23 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       assert.deepEqual(
         await db.query.parents.findMany({
           orderBy: [parents.id],
-          with: { children: { limit: 1, columns: { id: true } } },
+          with: {
+            children: {
+              limit: 1,
+              columns: {
+                id: true,
+              },
+            },
+          },
         }),
         rows
       )
 
       const child = await db.query.children.findFirst({
         orderBy: [children.id],
-        with: { parent: true },
+        with: {
+          parent: true,
+        },
       })
 
       assert.deepEqual(child.parent, { id: 9007199254740993n })
@@ -379,7 +433,13 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
 
     assert.equal(await count(base, 'payload-migrations'), 1)
     assert.equal(
-      (await base.findByID({ collection: 'posts', id: post.id, overrideAccess: true })).title,
+      (
+        await base.findByID({
+          collection: 'posts',
+          id: post.id,
+          overrideAccess: true,
+        })
+      ).title,
       'Revised post'
     )
 
@@ -414,11 +474,14 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
     const historyCount = await count(base, 'payload-migrations')
 
     const emptyDir = await mkdtemp(fileURLToPath(new URL('./.migrations-empty-', import.meta.url)))
+
     payload.db.migrationDir = emptyDir
 
     try {
       await assert.rejects(
-        payload.db.migrateFresh({ forceAcceptWarning: true }),
+        payload.db.migrateFresh({
+          forceAcceptWarning: true,
+        }),
         /requires valid migration files/
       )
       assert.equal(await count(base, 'posts'), 1)
@@ -428,7 +491,9 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       await rm(emptyDir, { recursive: true, force: true })
     }
 
-    await payload.db.migrateFresh({ forceAcceptWarning: true })
+    await payload.db.migrateFresh({
+      forceAcceptWarning: true,
+    })
 
     assert.equal(await count(payload, 'payload-migrations'), 2)
     assert.equal(await count(payload, 'posts'), 0)
@@ -504,21 +569,47 @@ function makeConfig({ connectionString, migrationDir, push, withTags, WebSocket 
     telemetry: false,
     secret: 'local-validation-only',
     db: surrealdbAdapter({
-      pool: WebSocket ? { connectionString, timeout: 0, WebSocket } : connectionString,
+      pool: WebSocket
+        ? {
+            connectionString,
+            timeout: 0,
+            WebSocket,
+          }
+        : connectionString,
       migrationDir,
       push,
     }),
     collections: [
-      { slug: 'users', auth: true, fields: [] },
-      { slug: 'authors', fields: [{ name: 'name', type: 'text', required: true }] },
+      {
+        slug: 'users',
+        auth: true,
+        fields: [],
+      },
+      {
+        slug: 'authors',
+        fields: [
+          {
+            name: 'name',
+            type: 'text',
+            required: true,
+          },
+        ],
+      },
       ...(withTags
         ? [
             {
               slug: 'tags',
               versions: true,
               fields: [
-                { name: 'label', type: 'text' },
-                { name: 'color', type: 'select', options: ['blue', 'green'] },
+                {
+                  name: 'label',
+                  type: 'text',
+                },
+                {
+                  name: 'color',
+                  type: 'select',
+                  options: ['blue', 'green'],
+                },
               ],
             },
           ]
@@ -527,17 +618,56 @@ function makeConfig({ connectionString, migrationDir, push, withTags, WebSocket 
         slug: 'posts',
         versions: { drafts: true },
         fields: [
-          { name: 'title', type: 'text', required: true },
-          { name: 'author', type: 'relationship', relationTo: 'authors' },
-          { name: 'reviewers', type: 'relationship', relationTo: 'authors', hasMany: true },
+          {
+            name: 'title',
+            type: 'text',
+            required: true,
+          },
+          {
+            name: 'author',
+            type: 'relationship',
+            relationTo: 'authors',
+          },
+          {
+            name: 'reviewers',
+            type: 'relationship',
+            relationTo: 'authors',
+            hasMany: true,
+          },
           ...(withTags
-            ? [{ name: 'tags', type: 'relationship', relationTo: 'tags', hasMany: true }]
+            ? [
+                {
+                  name: 'tags',
+                  type: 'relationship',
+                  relationTo: 'tags',
+                  hasMany: true,
+                },
+              ]
             : []),
-          { name: 'sections', type: 'array', fields: [{ name: 'heading', type: 'text' }] },
+          {
+            name: 'sections',
+            type: 'array',
+            fields: [
+              {
+                name: 'heading',
+                type: 'text',
+              },
+            ],
+          },
         ],
       },
     ],
-    globals: [{ slug: 'settings', fields: [{ name: 'title', type: 'text' }] }],
+    globals: [
+      {
+        slug: 'settings',
+        fields: [
+          {
+            name: 'title',
+            type: 'text',
+          },
+        ],
+      },
+    ],
   })
 }
 
@@ -547,6 +677,7 @@ function exposeMigrationError(t, payload) {
   t.mock.method(payload.logger, 'error', ({ err }) => {
     migrationError = err
   })
+
   t.mock.method(process, 'exit', (code) => {
     assert.equal(code, 1)
     assert.ok(migrationError instanceof Error)

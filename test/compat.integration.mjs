@@ -9,21 +9,47 @@ const hookFailure = new Error('intentional afterChange failure')
 
 test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
   const { connectionString, migrationDir, namespace, query } = await setupDatabase(t)
+
   const config = buildConfig({
     db: surrealdbAdapter({ pool: connectionString, migrationDir, push: false }),
     secret: 'local-validation-only',
     telemetry: false,
-    localization: { defaultLocale: 'en', locales: ['en', 'fr'] },
+    localization: {
+      defaultLocale: 'en',
+      locales: ['en', 'fr'],
+    },
     collections: [
-      { slug: 'users', auth: true, fields: [] },
+      {
+        slug: 'users',
+        auth: true,
+        fields: [],
+      },
       {
         slug: 'authors',
         fields: [
-          { name: 'name', type: 'text', required: true },
-          { name: 'posts', type: 'join', collection: 'posts', on: 'author' },
+          {
+            name: 'name',
+            type: 'text',
+            required: true,
+          },
+          {
+            name: 'posts',
+            type: 'join',
+            collection: 'posts',
+            on: 'author',
+          },
         ],
       },
-      { slug: 'topics', fields: [{ name: 'label', type: 'text', required: true }] },
+      {
+        slug: 'topics',
+        fields: [
+          {
+            name: 'label',
+            type: 'text',
+            required: true,
+          },
+        ],
+      },
       {
         slug: 'posts',
         hooks: {
@@ -35,7 +61,9 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
 
               await req.payload.create({
                 collection: 'authors',
-                data: { name: doc.title },
+                data: {
+                  name: doc.title,
+                },
                 overrideAccess: true,
                 req,
               })
@@ -45,10 +73,15 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
                 overrideAccess: true,
                 req,
                 where: {
-                  parent: { equals: doc.id },
-                  'version.title': { equals: doc.title },
+                  parent: {
+                    equals: doc.id,
+                  },
+                  'version.title': {
+                    equals: doc.title,
+                  },
                 },
               })
+
               assert.equal(versions.totalDocs, 1)
 
               throw hookFailure
@@ -57,9 +90,21 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         },
         versions: { drafts: true },
         fields: [
-          { name: 'title', type: 'text', required: true },
-          { name: 'summary', type: 'text', localized: true },
-          { name: 'author', type: 'relationship', relationTo: 'authors' },
+          {
+            name: 'title',
+            type: 'text',
+            required: true,
+          },
+          {
+            name: 'summary',
+            type: 'text',
+            localized: true,
+          },
+          {
+            name: 'author',
+            type: 'relationship',
+            relationTo: 'authors',
+          },
           {
             name: 'related',
             type: 'relationship',
@@ -73,12 +118,18 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       {
         slug: 'settings',
         versions: { drafts: true },
-        fields: [{ name: 'title', type: 'text' }],
+        fields: [
+          {
+            name: 'title',
+            type: 'text',
+          },
+        ],
       },
     ],
   })
 
   const payload = await getPayload({ config, key: namespace })
+
   t.after(() => payload.destroy())
 
   await migrateInitial(payload)
@@ -100,7 +151,10 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
     })
   }
 
-  const credentials = { email: 'editor@example.invalid', password: 'local-test-password' }
+  const credentials = {
+    email: 'editor@example.invalid',
+    password: 'local-test-password',
+  }
 
   const editor = await payload.create({
     overrideAccess: true,
@@ -120,11 +174,19 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
   await t.test(
     'authenticated REST writes are visible through REST and native SurrealQL',
     async () => {
-      const rejected = await request('posts', { method: 'POST', data: { title: 'Unauthorised' } })
+      const rejected = await request('posts', {
+        method: 'POST',
+        data: {
+          title: 'Unauthorised',
+        },
+      })
 
       assert.equal(rejected.status, 403)
 
-      const login = await request('users/login', { method: 'POST', data: credentials })
+      const login = await request('users/login', {
+        method: 'POST',
+        data: credentials,
+      })
 
       const { token, user } = await login.json()
 
@@ -132,7 +194,13 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       assert.equal(user.id, editor.id)
       assert.ok(token)
 
-      const create = await request('posts', { method: 'POST', token, data: { title: 'REST post' } })
+      const create = await request('posts', {
+        method: 'POST',
+        token,
+        data: {
+          title: 'REST post',
+        },
+      })
 
       const body = await create.json()
 
@@ -148,6 +216,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       const rows = await query(
         `USE NS ${namespace} DB cms; SELECT title FROM posts WHERE title = 'REST post';`
       )
+
       assert.deepEqual(rows, [{ title: 'REST post' }])
     }
   )
@@ -156,7 +225,10 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
     const collection = 'posts'
     const slug = 'payload-locked-documents'
 
-    const owner = { ...editor, collection: 'users' }
+    const owner = {
+      ...editor,
+      collection: 'users',
+    }
 
     const locked = await payload.create({
       overrideAccess: true,
@@ -234,7 +306,14 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
     assert.equal(detail._isLocked, true)
     assert.equal(detail._userEditing.id, owner.id)
 
-    const edit = { collection, id: locked.id, data: { title: 'Edited post' }, overrideLock: false }
+    const edit = {
+      collection,
+      id: locked.id,
+      data: {
+        title: 'Edited post',
+      },
+      overrideLock: false,
+    }
 
     await assert.rejects(
       payload.update({
@@ -244,6 +323,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       }),
       /currently locked/
     )
+
     const updated = await payload.update({
       overrideAccess: true,
       ...edit,
@@ -291,11 +371,24 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         }
 
         assert.equal(
-          (await payload.count({ overrideAccess: true, collection, where, req })).totalDocs,
+          (
+            await payload.count({
+              overrideAccess: true,
+              collection,
+              where,
+              req,
+            })
+          ).totalDocs,
           1
         )
         assert.equal(
-          (await payload.count({ overrideAccess: true, collection, where })).totalDocs,
+          (
+            await payload.count({
+              overrideAccess: true,
+              collection,
+              where,
+            })
+          ).totalDocs,
           0
         )
 
@@ -323,6 +416,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
 
   await t.test('Payload reports a failed commit and rolls back the write', async (t) => {
     const transactionID = await payload.db.beginTransaction()
+
     assert.ok(transactionID)
 
     try {
@@ -356,6 +450,7 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
         payload.db.commitTransaction(transactionID),
         (error) => error === failure
       )
+
       assert.equal(payload.db.sessions[transactionID], undefined)
 
       const result = await payload.count({
@@ -457,18 +552,28 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       const author = await payload.create({
         overrideAccess: true,
         collection: 'authors',
-        data: { name: 'Writer' },
+        data: {
+          name: 'Writer',
+        },
       })
 
       const topic = await payload.create({
         overrideAccess: true,
         collection: 'topics',
-        data: { label: 'News' },
+        data: {
+          label: 'News',
+        },
       })
 
       const related = [
-        { relationTo: 'topics', value: topic.id },
-        { relationTo: 'authors', value: author.id },
+        {
+          relationTo: 'topics',
+          value: topic.id,
+        },
+        {
+          relationTo: 'authors',
+          value: author.id,
+        },
       ]
 
       const post = await payload.create({
@@ -569,7 +674,9 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
           collection,
           id: post.id,
           locale: 'fr',
-          data: { summary },
+          data: {
+            summary,
+          },
           draft: true,
         })
       }
@@ -620,7 +727,9 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
       await payload.updateGlobal({
         overrideAccess: true,
         slug,
-        data: { title: 'Published settings' },
+        data: {
+          title: 'Published settings',
+        },
       })
 
       await payload.updateGlobal({

@@ -13,29 +13,63 @@ const createWebRequest =
 
 test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) => {
   const { connectionString, migrationDir, namespace } = await setupDatabase(t)
+
   const config = buildConfig({
     db: surrealdbAdapter({ pool: connectionString, migrationDir, push: false }),
     secret: 'local-validation-only',
     telemetry: false,
     collections: [
-      { slug: 'users', auth: true, fields: [] },
+      {
+        slug: 'users',
+        auth: true,
+        fields: [],
+      },
       {
         slug: 'authors',
-        access: { read: () => true },
-        fields: [{ name: 'name', type: 'text', required: true }],
+        access: {
+          read: () => true,
+        },
+        fields: [
+          {
+            name: 'name',
+            type: 'text',
+            required: true,
+          },
+        ],
       },
       {
         slug: 'articles',
         access: {
           create: ({ req }) => Boolean(req.user),
-          read: ({ req }) => (req.user ? true : { public: { equals: true } }),
+          read: ({ req }) =>
+            req.user
+              ? true
+              : {
+                  public: {
+                    equals: true,
+                  },
+                },
         },
         trash: true,
-        versions: { drafts: true },
+        versions: {
+          drafts: true,
+        },
         fields: [
-          { name: 'title', type: 'text', required: true },
-          { name: 'public', type: 'checkbox', defaultValue: false },
-          { name: 'author', type: 'relationship', relationTo: 'authors' },
+          {
+            name: 'title',
+            type: 'text',
+            required: true,
+          },
+          {
+            name: 'public',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            name: 'author',
+            type: 'relationship',
+            relationTo: 'authors',
+          },
         ],
       },
     ],
@@ -49,8 +83,15 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
 
   const { schema } = configToSchema(payload.config)
 
-  const articles = { collection: 'articles', overrideAccess: true }
-  const credentials = { email: 'graphql@example.invalid', password: 'local-test-password' }
+  const articles = {
+    collection: 'articles',
+    overrideAccess: true,
+  }
+
+  const credentials = {
+    email: 'graphql@example.invalid',
+    password: 'local-test-password',
+  }
 
   await payload.create({
     collection: 'users',
@@ -77,7 +118,14 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
 
     req.payloadAPI = 'GraphQL'
 
-    return graphql({ contextValue: { req }, schema, source, variableValues })
+    return graphql({
+      contextValue: {
+        req,
+      },
+      schema,
+      source,
+      variableValues,
+    })
   }
 
   function resultData(result) {
@@ -91,7 +139,9 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
     async () => {
       const author = await payload.create({
         collection: 'authors',
-        data: { name: 'GraphQL writer' },
+        data: {
+          name: 'GraphQL writer',
+        },
         overrideAccess: true,
       })
 
@@ -103,7 +153,11 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
         }
       }
     `
-      const variables = { title: 'First article', author: author.id }
+      const variables = {
+        title: 'First article',
+        author: author.id,
+      }
+
       const denied = await execute(create, variables)
 
       assert.equal(denied.errors?.length, 1)
@@ -181,10 +235,24 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
         }
       `
 
-      const { deleteArticle } = resultData(await execute(remove, { id: createArticle.id }, true))
+      const { deleteArticle } = resultData(
+        await execute(
+          remove,
+          {
+            id: createArticle.id,
+          },
+          true
+        )
+      )
 
       assert.equal(deleteArticle.id, createArticle.id)
-      await assert.rejects(payload.findByID({ ...articles, id: createArticle.id }), { status: 404 })
+      await assert.rejects(
+        payload.findByID({
+          ...articles,
+          id: createArticle.id,
+        }),
+        { status: 404 }
+      )
     }
   )
 
@@ -201,7 +269,12 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
         },
       })
 
-      const where = { id: { equals: id } }
+      const where = {
+        id: {
+          equals: id,
+        },
+      }
+
       const deletedAt = new Date().toISOString()
 
       async function moveToTrash() {
@@ -242,8 +315,20 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
         { status: 404 }
       )
 
-      const trashed = { ...articles, trash: true }
-      const onlyTrashed = { and: [where, { deletedAt: { exists: true } }] }
+      const trashed = {
+        ...articles,
+        trash: true,
+      }
+      const onlyTrashed = {
+        and: [
+          where,
+          {
+            deletedAt: {
+              exists: true,
+            },
+          },
+        ],
+      }
 
       assert.equal(
         (
@@ -299,11 +384,21 @@ test('Payload GraphQL and trash on SurrealDB', { timeout: 90_000 }, async (t) =>
 
       await moveToTrash()
 
-      const history = { ...trashed, where: { parent: { equals: id } } }
+      const history = {
+        ...trashed,
+        where: {
+          parent: {
+            equals: id,
+          },
+        },
+      }
 
       assert.ok((await payload.findVersions(history)).totalDocs > 0)
 
-      await payload.delete({ ...trashed, id })
+      await payload.delete({
+        ...trashed,
+        id,
+      })
 
       assert.equal(
         (

@@ -16,7 +16,10 @@ export async function setupDatabase(t) {
   async function query(body) {
     const response = await fetch(new URL('/sql', server), {
       method: 'POST',
-      headers: { accept: 'application/json', authorization },
+      headers: {
+        accept: 'application/json',
+        authorization,
+      },
       body,
       signal: AbortSignal.timeout(5000),
     })
@@ -35,6 +38,7 @@ export async function setupDatabase(t) {
   }
 
   await query(`DEFINE NAMESPACE ${namespace}; USE NS ${namespace}; DEFINE DATABASE cms;`)
+
   t.after(() => query(`REMOVE NAMESPACE IF EXISTS ${namespace};`))
 
   const connection = new URL('surrealdb+ws://localhost')

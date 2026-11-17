@@ -252,7 +252,9 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
     for (const [index, result] of results.entries()) {
       if (result.status === 'rejected') {
         const error = result.reason.cause ?? result.reason
+
         assert.equal(error.code, '40001', result.reason.stack)
+        
         await workers[index].jobs.run(options)
       }
     }
@@ -273,7 +275,9 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
 
     assert.ok(completed.completedAt)
     assert.equal(completed.totalTried, 1)
-    assert.deepEqual(completed.log[0].output, { name: 'ready' })
+    assert.deepEqual(completed.log[0].output, {
+      name: 'ready',
+    })
 
     const pending = await payload.findByID({
       collection,
