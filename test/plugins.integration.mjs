@@ -12,7 +12,11 @@ test('official Payload plugins on SurrealDB', { timeout: 90_000 }, async (t) => 
   const { connectionString, migrationDir, namespace } = await setupDatabase(t)
 
   const config = buildConfig({
-    db: surrealdbAdapter({ pool: connectionString, migrationDir, push: false }),
+    db: surrealdbAdapter({
+      pool: connectionString,
+      migrationDir,
+      push: false,
+    }),
     secret: 'local-validation-only',
     telemetry: false,
     collections: [
@@ -149,6 +153,7 @@ test('official Payload plugins on SurrealDB', { timeout: 90_000 }, async (t) => 
       })
 
       assert.equal(moved.parent, section.id)
+
       assert.deepEqual(path(moved), [
         {
           label: 'Services',

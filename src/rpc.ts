@@ -2,12 +2,27 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { type PoolConfig } from '@surrealdb/pg'
 
-type SocketCapture = { socket?: WebSocket; timeout?: number }
-type StatementResult = { status: string; result: unknown }
-type QueryReply = { id?: string; result?: StatementResult[]; error?: { message?: string } }
+import { transactionID } from './sql/transaction.js'
+
+type SocketCapture = {
+  socket?: WebSocket
+  timeout?: number
+}
+
+type StatementResult = {
+  status: string
+  result: unknown
+}
+
+type QueryReply = {
+  id?: string
+  result?: StatementResult[]
+  error?: {
+    message?: string
+  }
+}
 
 const sockets = new AsyncLocalStorage<SocketCapture>()
-const transactionID = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i
 
 export function migrationPool(options: PoolConfig): PoolConfig {
   const Socket = options.WebSocket ?? globalThis.WebSocket
@@ -140,7 +155,14 @@ function query(
     socket.addEventListener('error', disconnect)
 
     try {
-      socket.send(JSON.stringify({ id, method: 'query', params: [text], txn }))
+      socket.send(
+        JSON.stringify({
+          id,
+          method: 'query',
+          params: [text],
+          txn,
+        })
+      )
     } catch (error) {
       fail(error)
     }

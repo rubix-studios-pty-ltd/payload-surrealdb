@@ -365,8 +365,22 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
       })
 
       assert.deepEqual(rows, [
-        { id: 9007199254740993n, children: [{ id: 1n }] },
-        { id: 9007199254740994n, children: [{ id: 2n }] },
+        {
+          id: 9007199254740993n,
+          children: [
+            {
+              id: 1n,
+            },
+          ],
+        },
+        {
+          id: 9007199254740994n,
+          children: [
+            {
+              id: 2n,
+            },
+          ],
+        },
       ])
 
       assert.deepEqual(
@@ -484,6 +498,7 @@ test('Payload connects, migrates, reads, writes and removes a collection on Surr
         }),
         /requires valid migration files/
       )
+
       assert.equal(await count(base, 'posts'), 1)
       assert.equal(await count(base, 'payload-migrations'), historyCount)
     } finally {
@@ -681,6 +696,7 @@ function exposeMigrationError(t, payload) {
   t.mock.method(process, 'exit', (code) => {
     assert.equal(code, 1)
     assert.ok(migrationError instanceof Error)
+
     throw migrationError
   })
 }

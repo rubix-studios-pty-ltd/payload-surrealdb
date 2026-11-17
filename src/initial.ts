@@ -1,37 +1,21 @@
+import {
+  addColumn,
+  addedColumnName,
+  addForeignKey,
+  addKeyColumn,
+  columnIdentifiers,
+  createIndex,
+  createTable,
+  foreignKeyColumns,
+  keyColumn,
+  reference,
+} from './sql/initial.js'
 import { keywordEnds, split } from './statements.js'
 
-const identifier = '(?:"(?:[^"]|"")*"|[a-z_][\\w$]*)'
-const tableName = `(?:(?:"public"|public)\\s*\\.\\s*)?(${identifier})`
-const createTable = new RegExp(`^CREATE\\s+TABLE\\s+${tableName}\\s*\\([\\s\\S]*\\)$`, 'i')
-const addForeignKey = new RegExp(
-  `^ALTER\\s+TABLE\\s+${tableName}\\s+ADD\\s+(CONSTRAINT\\s+${identifier}\\s+FOREIGN\\s+KEY\\b[\\s\\S]*)$`,
-  'i'
-)
-const createIndex = new RegExp(
-  `^CREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${identifier}\\s+ON\\s+${tableName}\\s*(?:\\(|USING\\b)`,
-  'i'
-)
-const addColumn = new RegExp(`^ALTER\\s+TABLE\\s+${tableName}\\s+ADD\\s+COLUMN\\b`, 'i')
-const addedColumnName = new RegExp(
-  `${addColumn.source}\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(${identifier})`,
-  'i'
-)
-const foreignKeyColumns = new RegExp(
-  `^CONSTRAINT\\s+${identifier}\\s+FOREIGN\\s+KEY\\s*\\(\\s*(${identifier}(?:\\s*,\\s*${identifier})*)\\s*\\)`,
-  'i'
-)
-const columnIdentifiers = new RegExp(identifier, 'gi')
-const addKeyColumn = new RegExp(
-  `${addColumn.source}\\s+(${identifier})\\s+(?:smallint|integer|bigint|uuid|text|varchar)$`,
-  'i'
-)
-const keyColumn = new RegExp(
-  `^CONSTRAINT\\s+${identifier}\\s+FOREIGN\\s+KEY\\s*\\(\\s*(${identifier})\\s*\\)\\s+` +
-    `(REFERENCES\\s+${tableName}\\s*\\(\\s*(?:"id"|id)\\s*\\)` +
-    `(?:\\s+ON\\s+(?:DELETE\\s+(?:CASCADE|NO\\s+ACTION|RESTRICT|SET\\s+NULL)|UPDATE\\s+NO\\s+ACTION))*)$`,
-  'i'
-)
-const reference = new RegExp(`^\\s+${tableName}\\s*\\(`, 'i')
+type Column = {
+  index: number
+  statement: string
+}
 
 type Definition = {
   name: string
@@ -39,8 +23,6 @@ type Definition = {
   statement: string
   constraints: string[]
 }
-
-type AddedColumn = { index: number; statement: string }
 
 export function inlineKeys(source: string): string {
   const statements = split(source)
@@ -56,7 +38,12 @@ export function inlineKeys(source: string): string {
         return source
       }
 
-      const definition: Definition = { name: table, index, statement, constraints: [] }
+      const definition: Definition = {
+        name: table,
+        index,
+        statement,
+        constraints: [],
+      }
 
       definitions.set(table, definition)
       positions.set(index, definition)
@@ -107,6 +94,7 @@ export function inlineKeys(source: string): string {
       !sourceColumns ||
       [...sourceColumns.matchAll(columnIdentifiers)].some(([name]) => {
         const column = identifierName(name)
+
         return column !== undefined && laterColumns?.has(column)
       })
     ) {
@@ -151,7 +139,7 @@ export function inlineKeys(source: string): string {
 
 export function inlineAddedKeys(statements: string[]): string[] {
   const rewritten: (string | undefined)[] = [...statements]
-  const pending = new Map<string, Map<string, AddedColumn>>()
+  const pending = new Map<string, Map<string, Column>>()
 
   for (const [index, statement] of statements.entries()) {
     const addition = addKeyColumn.exec(statement)
@@ -159,7 +147,7 @@ export function inlineAddedKeys(statements: string[]): string[] {
     const column = identifierName(addition?.[2])
 
     if (owner !== undefined && column !== undefined) {
-      const columns = pending.get(owner) ?? new Map<string, AddedColumn>()
+      const columns = pending.get(owner) ?? new Map<string, Column>()
 
       columns.set(column, { index, statement })
       pending.set(owner, columns)

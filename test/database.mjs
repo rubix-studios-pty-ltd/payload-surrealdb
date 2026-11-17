@@ -43,18 +43,25 @@ export async function setupDatabase(t) {
 
   const connection = new URL('surrealdb+ws://localhost')
   const scheme = server.protocol === 'https:' ? 'surrealdb+wss:' : 'surrealdb+ws:'
+
   connection.hostname = server.hostname
   connection.port = server.port
   connection.username = 'root'
   connection.password = password
   connection.pathname = `/${namespace}/cms`
+
   const connectionString = connection.href.replace(/^surrealdb\+ws:/, scheme)
 
   const migrationDir = await mkdtemp(fileURLToPath(new URL('./.migrations-', import.meta.url)))
 
   t.after(() => rm(migrationDir, { recursive: true, force: true }))
 
-  return { connectionString, migrationDir, namespace, query }
+  return {
+    connectionString,
+    migrationDir,
+    namespace,
+    query,
+  }
 }
 
 export async function migrateInitial(payload) {
@@ -63,5 +70,6 @@ export async function migrateInitial(payload) {
     payload,
     forceAcceptWarning: true,
   })
+
   await payload.db.migrate()
 }

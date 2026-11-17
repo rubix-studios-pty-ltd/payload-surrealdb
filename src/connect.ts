@@ -73,6 +73,7 @@ export function bindConnection(adapter: PostgresAdapter, poolOptions: PoolConfig
       }
 
       const client = activePool as unknown as PostgresAdapter['pool']
+
       const database = drizzle({
         client,
         logger: adapter.logger ?? false,
@@ -87,6 +88,7 @@ export function bindConnection(adapter: PostgresAdapter, poolOptions: PoolConfig
       bindDatabase(adapter)
 
       adapter.resolveInitializing()
+
       initialized = true
 
       if (!hotReload && process.env.PAYLOAD_MIGRATING !== 'true') {
@@ -108,6 +110,7 @@ export function bindConnection(adapter: PostgresAdapter, poolOptions: PoolConfig
 
       if (!initialized) {
         void adapter.initializing.catch(() => undefined)
+
         adapter.rejectInitializing()
       }
 

@@ -94,12 +94,14 @@ export function bindMigrations(adapter: PostgresAdapter): void {
   const execute = adapter.execute.bind(adapter)
   const begin = adapter.beginTransaction.bind(adapter)
   const commit = adapter.commitTransaction.bind(adapter)
+
   const failures = new WeakMap<Session, unknown>()
 
   adapter.createMigration = async (options) => {
     const directory = adapter.migrationDir
     const before = migrationFiles(directory)
     const result = await createMigration(options)
+
     const originalImport = `import { MigrateUpArgs, MigrateDownArgs, sql } from '${adapter.packageName}'`
     const typedImport = `import { type MigrateUpArgs, type MigrateDownArgs, sql } from '${adapter.packageName}'`
 
@@ -164,6 +166,7 @@ export function bindMigrations(adapter: PostgresAdapter): void {
 
     if (session && failures.has(session)) {
       await adapter.rollbackTransaction(id)
+
       throw failures.get(session)
     }
 

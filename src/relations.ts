@@ -97,6 +97,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
   ): Promise<Row[]> {
     const joins = planJoins(table, query)
     const selectedKeys = selectKeys(table.columns, query.columns)
+
     const necessaryKeys = new Set([
       ...selectedKeys,
       ...requiredKeys,
@@ -106,10 +107,17 @@ export function bindRelations(database: Database, schema: Record<string, unknown
     const fields = Object.fromEntries(
       [...necessaryKeys].map((key) => [key, table.columns[key] as PgColumn])
     )
+
     const extras =
       typeof query.extras === 'function' ? query.extras(table.columns, { sql }) : query.extras
-    const projection = { ...fields, ...extras }
+
+    const projection = {
+      ...fields,
+      ...extras,
+    }
+
     const where = getWhere(query.where, table.columns)
+
     const order =
       typeof query.orderBy === 'function'
         ? query.orderBy(table.columns, getOrderByOperators())
@@ -191,6 +199,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
 
   async function loadJoin(database: Database, rows: Row[], join: Join): Promise<void> {
     const { name, target, isOne, query, sourceKeys, targetKeys } = join
+
     const parentKeys = new Map<string, unknown[]>()
 
     for (const row of rows) {
@@ -202,6 +211,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
     }
 
     const where = getWhere(query.where, target.columns)
+
     const columns = targetKeys.map((key) => {
       const column = target.columns[key]
 
@@ -235,6 +245,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
       }
 
       const keys = batch.map(([, values]) => values)
+
       const constraint =
         columns.length === 1
           ? inArray(
@@ -249,6 +260,7 @@ export function bindRelations(database: Database, schema: Record<string, unknown
         { ...query, where: and(where, constraint) },
         targetKeys
       )
+
       const selectedKeys = new Set(selectKeys(target.columns, query.columns))
 
       for (const row of related) {

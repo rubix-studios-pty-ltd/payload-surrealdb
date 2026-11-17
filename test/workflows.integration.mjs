@@ -204,6 +204,7 @@ test('Payload uploads and jobs on SurrealDB', { timeout: 90_000 }, async (t) => 
     await assert.rejects(readFile(join(staticDir, filename)), {
       code: 'ENOENT',
     })
+
     await assert.rejects(
       payload.findByID({
         collection: 'media',
