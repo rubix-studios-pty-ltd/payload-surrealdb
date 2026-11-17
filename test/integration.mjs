@@ -56,7 +56,14 @@ try {
   process.exitCode = await new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ['--import', 'tsx', '--test', '--test-force-exit', 'test/payload.integration.mjs'],
+      [
+        '--import',
+        'tsx',
+        '--test',
+        '--test-concurrency=1',
+        '--test-force-exit',
+        'test/*.integration.mjs',
+      ],
       {
         env: {
           ...process.env,

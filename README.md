@@ -5,7 +5,7 @@ A Payload CMS database adapter that integrates SurrealDB as a database backend. 
 [![npm version](https://img.shields.io/npm/v/@rubixstudios/payload-surrealdb.svg)](https://www.npmjs.com/package/@rubixstudios/payload-surrealdb)
 [![Release](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/actions/workflows/release.yml/badge.svg)](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/actions/workflows/release.yml)
 
-<img width="1919" height="1078" alt="image" src="https://github.com/user-attachments/assets/8f65606c-0c09-49b4-af32-c421aa53e402" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/0241dadb-f664-44fe-98e9-ebc403f7033a" />
 
 SurrealDB is an open-source, multi-model database designed to support structured and relational data through a unified database engine.
 
@@ -80,7 +80,7 @@ Automatic startup migrations apply existing files. Changes to collections and gl
 
 Generated collection removals use the same WebSocket transaction as the rest of the migration and its history entry. When two new tables reference each other and need indexes on their foreign-key fields, put the foreign keys and indexes in separate migrations. Changes that add a foreign key and an index to an existing table may also need separate migrations.
 
-`payload migrate:fresh` clears the schema after loading the migration files, then applies the migrations in order. Each replayed migration uses its own transaction.
+`payload migrate:fresh` clears the schema after loading the migration files, then applies the migrations in order. Forward migrations execute statements individually for SurrealDB schema compatibility. If a statement fails, earlier statements may already be applied and the failed migration will have no history entry. Inspect the schema before retrying.
 
 ## Notes
 
@@ -89,6 +89,14 @@ Generated collection removals use the same WebSocket transaction as the rest of 
 - Certain schema modifications may require adjustments to generated migrations, including foreign key constraints, indexes and column renaming.
 - SurrealDB 4.0.1 may report success for `ALTER TABLE ... RENAME COLUMN` without applying the rename. Verify these changes before deployment.
 - Test migration rollbacks and destructive schema changes against a disposable database before using them in production.
+
+## Validation
+
+Run `pnpm test` for the build and unit tests. Run `pnpm test:integration` for the migration and Payload smoke tests against a local SurrealDB 4.0.1 container.
+
+To use an existing SurrealDB test server, set `SURREAL_TEST_ENDPOINT` and `SURREAL_TEST_PASSWORD`. The harness uses the root account to create and remove a unique namespace for each suite.
+
+The smoke tests exercise authenticated REST requests, document locks, transaction visibility and failure handling, relationship filters and joins, localized drafts, and collection and global versions. The migration suite exercises migration generation, startup, rollback, and reapplication.
 
 ## License
 

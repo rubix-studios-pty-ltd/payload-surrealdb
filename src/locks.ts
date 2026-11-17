@@ -1,5 +1,9 @@
-import { type DeleteManyArgs, type FindArgs, type Where } from 'payload'
+import { type DeleteManyArgs, type FindArgs, type Where, type WhereField } from 'payload'
 import { type PostgresAdapter } from '@payloadcms/db-postgres'
+
+const collection = 'payload-locked-documents'
+const relationPath = 'document.relationTo'
+const valuePath = 'document.value'
 
 export function bindLocks(adapter: PostgresAdapter): void {
   const find = adapter.find.bind(adapter)
@@ -9,7 +13,7 @@ export function bindLocks(adapter: PostgresAdapter): void {
   adapter.deleteMany = (args) => deleteMany(lockQuery(args))
 
   function lockQuery<T extends FindArgs | DeleteManyArgs>(args: T): T {
-    if (args.collection !== 'payload-locked-documents' || !args.where) {
+    if (args.collection !== collection || !args.where) {
       return args
     }
 
@@ -17,46 +21,59 @@ export function bindLocks(adapter: PostgresAdapter): void {
   }
 
   function matchDocument(where: Where): Where {
-    const and = where.and?.map(matchDocument)
-    const or = where.or?.map(matchDocument)
-
-    if (!and) {
-      return or ? { ...where, or } : where
+    if (!where.and && !where.or) {
+      return where
     }
 
-    const targets = and.filter((clause) => equality(clause, 'document.relationTo') !== undefined)
-    const ids = and.filter((clause) => equality(clause, 'document.value') !== undefined)
+    const query = { ...where }
 
-    const [target] = targets
-    const [id] = ids
-
-    if (targets.length === 1 && ids.length === 1 && target && id) {
-      const relationTo = equality(target, 'document.relationTo')
-      const value = equality(id, 'document.value')
-
-      if (
-        typeof relationTo === 'string' &&
-        Object.hasOwn(adapter.payload.collections, relationTo) &&
-        adapter.payload.collections[relationTo]?.config.lockDocuments !== false &&
-        ((typeof value === 'number' && Number.isFinite(value)) ||
-          (typeof value === 'string' && value.length > 0 && value !== 'null'))
-      ) {
-        return {
-          ...where,
-          ...(or && { or }),
-          and: [
-            ...and.filter((clause) => clause !== target && clause !== id),
-            { document: { equals: { relationTo, value } } },
-          ],
-        }
-      }
+    if (where.or) {
+      query.or = where.or.map(matchDocument)
     }
 
-    return { ...where, and, ...(or && { or }) }
+    if (where.and) {
+      query.and = targetDocument(where.and.map(matchDocument))
+    }
+
+    return query
+  }
+
+  function targetDocument(clauses: Where[]): Where[] {
+    const relations = clauses.filter((clause) => Object.hasOwn(clause, relationPath))
+    const documents = clauses.filter((clause) => Object.hasOwn(clause, valuePath))
+
+    const [relation] = relations
+    const [document] = documents
+
+    if (relations.length !== 1 || documents.length !== 1 || !relation || !document) {
+      return clauses
+    }
+
+    const relationTo = singleCondition(relation, relationPath)?.equals
+    const ids = documentIDs(singleCondition(document, valuePath))
+
+    if (
+      !ids.length ||
+      typeof relationTo !== 'string' ||
+      !Object.hasOwn(adapter.payload.collections, relationTo) ||
+      adapter.payload.collections[relationTo]?.config.lockDocuments === false
+    ) {
+      return clauses
+    }
+
+    const matches = [...new Set(ids)].map(
+      (value): Where => ({ document: { equals: { relationTo, value } } })
+    )
+    const [first] = matches
+
+    return [
+      ...clauses.filter((clause) => clause !== relation && clause !== document),
+      matches.length === 1 && first ? first : { or: matches },
+    ]
   }
 }
 
-function equality(where: Where, field: string): unknown {
+function singleCondition(where: Where, field: string): WhereField | undefined {
   const operators = where[field]
 
   if (
@@ -65,6 +82,22 @@ function equality(where: Where, field: string): unknown {
     !Array.isArray(operators) &&
     Object.keys(operators).length === 1
   ) {
-    return operators.equals
+    return operators
   }
+}
+
+function documentIDs(condition?: WhereField): (number | string)[] {
+  if (Array.isArray(condition?.in)) {
+    return condition.in.every(isID) ? condition.in : []
+  }
+
+  return isID(condition?.equals) ? [condition.equals] : []
+}
+
+function isID(value: unknown): value is number | string {
+  if (typeof value === 'number') {
+    return Number.isFinite(value)
+  }
+
+  return typeof value === 'string' && value.length > 0 && value !== 'null'
 }

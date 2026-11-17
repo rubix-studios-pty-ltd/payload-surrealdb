@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -11,11 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  id-token: write
-  contents: write
-  issues: write
-  pull-requests: write
-  packages: write
+  contents: read
 
 jobs:
   test:
@@ -80,7 +79,14 @@ jobs:
         run: docker logs payload-surrealdb-test || true
 
   release:
+    if: github.event_name != 'pull_request'
     needs: test
+    permissions:
+      id-token: write
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
     runs-on: ubuntu-latest
 
     steps:

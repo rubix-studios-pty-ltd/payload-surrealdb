@@ -4,6 +4,7 @@ import { bindConnection } from './connect.js'
 import { bindLocks } from './locks.js'
 import { bindMigrations } from './migrations.js'
 import { setSessionKeys } from './schema.js'
+import { bindTransactions } from './transactions.js'
 import { type SurrealDBAdapterArgs } from './types.js'
 
 const packageName = '@rubixstudios/payload-surrealdb'
@@ -34,6 +35,7 @@ export function surrealdbAdapter(args: SurrealDBAdapterArgs): ReturnType<typeof 
 
       adapter.packageName = packageName
       bindConnection(adapter, pool)
+      bindTransactions(adapter)
       bindMigrations(adapter)
       bindLocks(adapter)
 
