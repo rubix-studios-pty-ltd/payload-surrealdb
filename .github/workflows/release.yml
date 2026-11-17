@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -11,11 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  id-token: write
-  contents: write
-  issues: write
-  pull-requests: write
-  packages: write
+  contents: read
 
 jobs:
   test:
@@ -47,7 +46,15 @@ jobs:
 
       - name: Select Payload
         if: matrix.payload == '4.0.0-beta.9'
-        run: pnpm add --save-dev --save-exact payload@4.0.0-beta.9 @payloadcms/db-postgres@4.0.0-beta.9
+        run: |
+          version="${{ matrix.payload }}"
+          pnpm add --save-dev --save-exact \
+            "payload@$version" \
+            "@payloadcms/db-postgres@$version" \
+            "@payloadcms/graphql@$version" \
+            "@payloadcms/plugin-nested-docs@$version" \
+            "@payloadcms/plugin-redirects@$version" \
+            "@payloadcms/plugin-search@$version"
 
       - name: Check source
         run: pnpm exec biome check src test package.json tsconfig.json
@@ -80,7 +87,14 @@ jobs:
         run: docker logs payload-surrealdb-test || true
 
   release:
+    if: github.event_name != 'pull_request'
     needs: test
+    permissions:
+      id-token: write
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
     runs-on: ubuntu-latest
 
     steps:

@@ -39,7 +39,12 @@ try {
         '0.0.0.0:8000',
         'memory',
       ],
-      { env: { ...process.env, SURREAL_PASS: password } }
+      {
+        env: {
+          ...process.env,
+          SURREAL_PASS: password,
+        },
+      }
     )
 
     container = stdout.trim()
@@ -56,7 +61,14 @@ try {
   process.exitCode = await new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ['--import', 'tsx', '--test', '--test-force-exit', 'test/payload.integration.mjs'],
+      [
+        '--import',
+        'tsx',
+        '--test',
+        '--test-concurrency=1',
+        '--test-force-exit',
+        'test/*.integration.mjs',
+      ],
       {
         env: {
           ...process.env,

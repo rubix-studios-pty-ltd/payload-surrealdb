@@ -80,7 +80,7 @@ Automatic startup migrations apply existing files. Changes to collections and gl
 
 Generated collection removals use the same WebSocket transaction as the rest of the migration and its history entry. When two new tables reference each other and need indexes on their foreign-key fields, put the foreign keys and indexes in separate migrations. Changes that add a foreign key and an index to an existing table may also need separate migrations.
 
-`payload migrate:fresh` clears the schema after loading the migration files, then applies the migrations in order. Each replayed migration uses its own transaction.
+`payload migrate:fresh` clears the schema after loading the migration files, then applies the migrations in order. Forward migrations execute statements individually for SurrealDB schema compatibility. If a statement fails, earlier statements may already be applied and the failed migration will have no history entry. Inspect the schema before retrying.
 
 ## Notes
 
@@ -89,6 +89,18 @@ Generated collection removals use the same WebSocket transaction as the rest of 
 - Certain schema modifications may require adjustments to generated migrations, including foreign key constraints, indexes and column renaming.
 - SurrealDB 4.0.1 may report success for `ALTER TABLE ... RENAME COLUMN` without applying the rename. Verify these changes before deployment.
 - Test migration rollbacks and destructive schema changes against a disposable database before using them in production.
+
+## Validation
+
+Run `pnpm test` for the build and unit tests. Run `pnpm test:integration` for the migration and Payload smoke tests against a local SurrealDB 4.0.1 container.
+
+To use an existing SurrealDB test server, set `SURREAL_TEST_ENDPOINT` and `SURREAL_TEST_PASSWORD`. The harness uses the root account to create and remove a unique namespace for each suite.
+
+The smoke tests exercise authenticated REST requests, multipart uploads and downloads, document locks, relationship filters and joins, localized drafts, and version history. Transaction checks verify that a failed hook rolls back document updates, related writes, and version entries together. The job suite runs two workers against the same queue and verifies that a contested claim executes once and leaves scheduled jobs pending. The migration suite exercises migration generation, startup, rollback, and reapplication.
+
+The GraphQL suite executes Payload's generated schema and checks authentication, access filters, mutations and relationship pagination. Trash tests cover default visibility, restore, permanent deletion and version cleanup. The plugin suite exercises Nested Docs breadcrumb updates, Redirects destination types and source uniqueness, and Search index synchronization.
+
+SurrealDB can return SQLSTATE `40001` when two workers try to claim the same job. The worker can poll again after a claim transaction fails with that error.
 
 ## License
 
