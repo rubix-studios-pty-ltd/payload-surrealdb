@@ -1,6 +1,7 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
 
 import { bindConnection } from './connect.js'
+import { bindLocks } from './locks.js'
 import { bindMigrations } from './migrations.js'
 import { setSessionKeys } from './schema.js'
 import { type SurrealDBAdapterArgs } from './types.js'
@@ -34,6 +35,7 @@ export function surrealdbAdapter(args: SurrealDBAdapterArgs): ReturnType<typeof 
       adapter.packageName = packageName
       bindConnection(adapter, pool)
       bindMigrations(adapter)
+      bindLocks(adapter)
 
       return adapter
     },
