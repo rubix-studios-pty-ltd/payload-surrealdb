@@ -17,7 +17,7 @@ The adapter supports Payload CMS v3 and v4, with SurrealDB v4 required for SQL c
 
 | Component   | Supported versions             |
 | ----------- | ------------------------------ |
-| Payload CMS | `^3.94.0` or `^4.0.0-beta.10`   |
+| Payload CMS | `^3.94.0` or `^4.0.0-beta.10`  |
 | SurrealDB   | v4, validated with `4.0.1`     |
 | Drizzle ORM | `0.45.2`                       |
 | Node.js     | `>=24.22.3 <25` or `>=26.13.1` |
