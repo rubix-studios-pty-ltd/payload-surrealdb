@@ -350,6 +350,89 @@ test('Payload operations on SurrealDB', { timeout: 90_000 }, async (t) => {
     )
   })
 
+  await t.test('document lock reads see locks committed after a transaction snapshot', async () => {
+    const collection = 'payload-locked-documents'
+
+    const post = await payload.create({
+      collection: 'posts',
+      data: {
+        title: 'Snapshot lock probe',
+      },
+      overrideAccess: true,
+    })
+    const where = {
+      and: [
+        {
+          'document.relationTo': {
+            equals: 'posts',
+          },
+        },
+        {
+          'document.value': {
+            equals: post.id,
+          },
+        },
+      ],
+    }
+    const transactionID = await payload.db.beginTransaction()
+
+    assert.ok(transactionID)
+
+    const req = { transactionID: Promise.resolve(transactionID) }
+
+    const args = {
+      collection,
+      req,
+      where,
+      pagination: false,
+      limit: 1,
+    }
+
+    let lock
+
+    try {
+      assert.equal((await payload.db.find(args)).docs.length, 0)
+
+      lock = await payload.create({
+        collection,
+        data: {
+          document: {
+            relationTo: 'posts',
+            value: post.id,
+          },
+          user: {
+            relationTo: 'users',
+            value: editor.id,
+          },
+        },
+        overrideAccess: true,
+      })
+
+      assert.equal((await payload.db.find(args)).docs.length, 0)
+
+      const result = await payload.db.findDocumentLocks(args)
+
+      assert.deepEqual(
+        result.docs.map(({ id }) => id),
+        [lock.id]
+      )
+
+      assert.deepEqual(result.docs[0].user, {
+        relationTo: 'users',
+        value: editor.id,
+      })
+
+      assert.equal(await req.transactionID, transactionID)
+
+      assert.ok(payload.db.sessions[transactionID])
+    } finally {
+      await payload.db.rollbackTransaction(transactionID)
+      if (lock) {
+        await payload.delete({ collection, id: lock.id, overrideAccess: true })
+      }
+    }
+  })
+
   await t.test('Payload transactions isolate writes and support rollback and commit', async () => {
     const collection = 'authors'
 

@@ -172,3 +172,71 @@ test('lock filters preserve unsupported and ambiguous predicates', () => {
     )
   }
 })
+
+test('document lock reads bypass the editing transaction and use the normalized query', async () => {
+  const adapter = createAdapter()
+
+  const req = { transactionID: Promise.resolve('active-transaction') }
+
+  const where = {
+    and: [
+      {
+        'document.relationTo': {
+          equals: 'posts',
+        },
+      },
+      {
+        'document.value': {
+          equals: 42,
+        },
+      },
+    ],
+  }
+
+  const args = {
+    collection,
+    where,
+    req,
+    limit: 1,
+    pagination: false,
+    sort: '-updatedAt',
+  }
+
+  const result = await adapter.findDocumentLocks(args)
+
+  assert.equal(result.req, undefined)
+  assert.equal(result.limit, args.limit)
+  assert.equal(result.pagination, args.pagination)
+  assert.equal(result.sort, args.sort)
+
+  assert.deepEqual(result.where, {
+    and: [
+      {
+        document: {
+          equals: {
+            relationTo: 'posts',
+            value: 42,
+          },
+        },
+      },
+    ],
+  })
+
+  assert.equal(args.req, req)
+  assert.equal(args.where, where)
+
+  const globalQuery = {
+    collection,
+    req,
+    where: {
+      globalSlug: {
+        equals: 'settings',
+      },
+    },
+  }
+
+  const globalResult = await adapter.findDocumentLocks(globalQuery)
+
+  assert.equal(globalResult.req, undefined)
+  assert.deepEqual(globalResult.where, globalQuery.where)
+})

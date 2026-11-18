@@ -12,6 +12,10 @@ export function bindLocks(adapter: PostgresAdapter): void {
   adapter.find = <T>(args: FindArgs) => find<T>(lockQuery(args))
   adapter.deleteMany = (args) => deleteMany(lockQuery(args))
 
+  Object.assign(adapter, {
+    findDocumentLocks: <T>(args: FindArgs) => adapter.find<T>({ ...args, req: undefined }),
+  })
+
   function lockQuery<T extends FindArgs | DeleteManyArgs>(args: T): T {
     if (args.collection !== collection || !args.where) {
       return args
