@@ -3,10 +3,10 @@ import { type PostgresAdapter } from '@payloadcms/db-postgres'
 import { type Client, Pool, type PoolConfig } from '@surrealdb/pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 
+import { bindQueries } from './compat.js'
 import { bindDatabase, startupMigrate } from './migrations.js'
 import { bindRelations } from './relations.js'
 import { migrationPool } from './rpc.js'
-import { bindQueries } from './compat.js'
 
 export function bindConnection(adapter: PostgresAdapter, poolOptions: PoolConfig): void {
   const destroyAdapter = adapter.destroy?.bind(adapter)
