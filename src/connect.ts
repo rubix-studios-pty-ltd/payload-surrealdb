@@ -1,8 +1,9 @@
 import { type Migration } from 'payload'
 import { type PostgresAdapter } from '@payloadcms/db-postgres'
-import { Pool, type PoolConfig } from '@surrealdb/pg'
+import { type Client, Pool, type PoolConfig } from '@surrealdb/pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 
+import { bindQueries } from './compat.js'
 import { bindDatabase, startupMigrate } from './migrations.js'
 import { bindRelations } from './relations.js'
 import { migrationPool } from './rpc.js'
@@ -61,6 +62,10 @@ export function bindConnection(adapter: PostgresAdapter, poolOptions: PoolConfig
       activePool = pool ?? new Pool(migrationPool(poolOptions))
 
       if (!pool) {
+        bindQueries(activePool)
+
+        activePool.on('connect', (client: Client) => bindQueries(client))
+
         const client = await activePool.connect()
 
         try {

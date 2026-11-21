@@ -66,11 +66,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8",
-    "@payloadcms/db-postgres": "^3.94.0",
-    "@payloadcms/graphql": "^3.94.0",
-    "@payloadcms/plugin-nested-docs": "^3.94.0",
-    "@payloadcms/plugin-redirects": "^3.94.0",
-    "@payloadcms/plugin-search": "^3.94.0",
+    "@payloadcms/db-postgres": "^3.94.1",
+    "@payloadcms/graphql": "^3.94.1",
+    "@payloadcms/plugin-nested-docs": "^3.94.1",
+    "@payloadcms/plugin-redirects": "^3.94.1",
+    "@payloadcms/plugin-search": "^3.94.1",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/git": "^11.0.1",
     "@swc/cli": "^0.8.2",
@@ -81,16 +81,16 @@
     "cross-env": "^10.1.0",
     "drizzle-orm": "0.45.2",
     "graphql": "^17.1.0",
-    "payload": "^3.94.0",
+    "payload": "^3.94.1",
     "rimraf": "^6.1.4",
     "semantic-release": "^26.0.1",
     "tsx": "4.23.15",
     "typescript": "^7.0.2"
   },
   "peerDependencies": {
-    "@payloadcms/db-postgres": "^3.94.0 || ^4.0.0-beta.10",
+    "@payloadcms/db-postgres": "^3.94.1 || ^4.0.0-beta.11",
     "drizzle-orm": "0.45.2",
-    "payload": "^3.94.0 || ^4.0.0-beta.10"
+    "payload": "^3.94.1 || ^4.0.0-beta.11"
   },
   "engines": {
     "node": ">=24.22.3 <25 || >=26.13.1",
