@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/compare/v1.1.1...v1.1.2) (2026-11-21)
+
+### Bug Fixes
+
+* **postgres:** compatibility, like escape is a limitation introduced the update. ([d16e181](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/commit/d16e181d7978fa63828e4780f9cb4b8eff3206ff))
+* **postgres:** compatibility, like escape is a limitation introduced the update. ([f15d76a](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/commit/f15d76a37bffb542893cbc25620af4322314cc40))
+* release ([4a7d32e](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/commit/4a7d32e592396d02ddf71d3331dbfa87e3c8adf9))
+
 ## [1.1.1](https://github.com/rubix-studios-pty-ltd/payload-surrealdb/compare/v1.1.0...v1.1.1) (2026-11-18)
 
 ### Bug Fixes
